@@ -1,0 +1,602 @@
+[
+  {
+    "id": "query_001",
+    "text": "Summarize the following article about renewable energy trends in 2025: Solar panel installations reached record levels globally, with China leading deployment at over 350 GW of new capacity. Wind energy also saw significant growth, particularly offshore installations in Europe and Asia. Battery storage costs continued to decline, falling below $100/kWh for utility-scale projects. However, grid infrastructure remained a bottleneck in many regions, with curtailment rates increasing in areas with high renewable penetration. Policy support strengthened in most major economies, though subsidy structures shifted from direct incentives to competitive auction mechanisms.",
+    "type": "summarization",
+    "expected_output_length": "medium"
+  },
+  {
+    "id": "query_002",
+    "text": "Classify the following customer email into one of these categories: billing inquiry, technical support, account cancellation, feature request, or general feedback. Email: 'Hi, I've been trying to export my data as a CSV file but the button seems to be grayed out. I have a Pro subscription and this feature should be available to me. Can someone help me resolve this? I need the export for a presentation tomorrow morning.'",
+    "type": "classification",
+    "expected_output_length": "short"
+  },
+  {
+    "id": "query_003",
+    "text": "What is the difference between a stack and a queue in computer science?",
+    "type": "qa",
+    "expected_output_length": "medium"
+  },
+  {
+    "id": "query_004",
+    "text": "A farmer has 120 meters of fencing to enclose a rectangular field that borders a straight river. No fencing is needed along the river. What dimensions of the field will maximize the enclosed area, and what is that maximum area? Show your reasoning step by step.",
+    "type": "reasoning",
+    "expected_output_length": "long"
+  },
+  {
+    "id": "query_005",
+    "text": "Write a short story (about 300 words) about an astronaut who discovers that the signals coming from a distant star are actually a language. The tone should be contemplative and slightly melancholic.",
+    "type": "creative",
+    "expected_output_length": "long"
+  },
+  {
+    "id": "query_006",
+    "text": "Write a Python function that takes a list of integers and returns the longest increasing subsequence. Include type hints and a docstring.",
+    "type": "code",
+    "expected_output_length": "long"
+  },
+  {
+    "id": "query_007",
+    "text": "Extract all company names, monetary amounts, and dates from the following paragraph: 'On March 15, 2025, Acme Corp announced a $4.2 billion acquisition of Widget Industries. The deal, brokered by Goldman Sachs, is expected to close by Q3 2025. Separately, TechNova Inc. reported quarterly revenue of $890 million, up 12% from the prior year. Analysts at Morgan Stanley raised their price target to $145 per share.'",
+    "type": "extraction",
+    "expected_output_length": "medium"
+  },
+  {
+    "id": "query_008",
+    "text": "Translate the following English text to French: 'The meeting has been rescheduled to next Thursday at 3 PM. Please confirm your attendance by end of day Wednesday. Light refreshments will be provided.'",
+    "type": "translation",
+    "expected_output_length": "short"
+  },
+  {
+    "id": "query_009",
+    "text": "Summarize the key points of the following product review: 'I bought this wireless keyboard three weeks ago and have been using it daily for work. The build quality is excellent -- the aluminum frame feels premium and sturdy. Battery life has been outstanding, lasting over two weeks on a single charge. The keys have a satisfying tactile feel with just the right amount of travel. My only complaints are that the Bluetooth connection occasionally drops for a split second when my phone is nearby, and the lack of backlighting makes it difficult to use in dim environments. Overall, for the $79 price point, this is a solid purchase that I would recommend to anyone looking for a reliable wireless keyboard for office use.'",
+    "type": "summarization",
+    "expected_output_length": "medium"
+  },
+  {
+    "id": "query_010",
+    "text": "Classify the sentiment of this product review as positive, negative, or mixed: 'The camera takes stunning photos in daylight but the night mode is basically unusable. For the price, I expected better low-light performance.'",
+    "type": "classification",
+    "expected_output_length": "short"
+  },
+  {
+    "id": "query_011",
+    "text": "How does photosynthesis work? Explain it in terms a 10-year-old could understand.",
+    "type": "qa",
+    "expected_output_length": "medium"
+  },
+  {
+    "id": "query_012",
+    "text": "If all roses are flowers, and some flowers fade quickly, can we conclude that some roses fade quickly? Explain your logical reasoning.",
+    "type": "reasoning",
+    "expected_output_length": "medium"
+  },
+  {
+    "id": "query_013",
+    "text": "Write a haiku about debugging code late at night.",
+    "type": "creative",
+    "expected_output_length": "short"
+  },
+  {
+    "id": "query_014",
+    "text": "Write a SQL query to find the top 10 customers by total order value in the last 90 days, including their name, email, total orders, and total spend. Assume tables: customers(id, name, email), orders(id, customer_id, total_amount, created_at).",
+    "type": "code",
+    "expected_output_length": "medium"
+  },
+  {
+    "id": "query_015",
+    "text": "Extract the key skills, years of experience, and education level from this resume snippet: 'Senior Software Engineer with 8+ years of experience in full-stack development. Proficient in Python, JavaScript, TypeScript, React, Node.js, and PostgreSQL. Experienced with AWS services including Lambda, ECS, and DynamoDB. Led teams of 5-10 engineers. Master of Science in Computer Science from Stanford University, 2016. Bachelor of Science in Mathematics from UCLA, 2014.'",
+    "type": "extraction",
+    "expected_output_length": "medium"
+  },
+  {
+    "id": "query_016",
+    "text": "Translate this technical documentation from English to Spanish: 'To configure the API endpoint, set the BASE_URL environment variable in your .env file. Authentication requires a valid API key passed in the Authorization header using the Bearer scheme. Rate limits are set to 1000 requests per minute for standard tier accounts.'",
+    "type": "translation",
+    "expected_output_length": "medium"
+  },
+  {
+    "id": "query_017",
+    "text": "Summarize the following meeting notes into 3-5 bullet points highlighting decisions made and action items: 'The product team met on Tuesday to discuss the Q2 roadmap. Sarah presented the user research findings showing that 67% of users want a dark mode feature, while 45% requested improved search functionality. The team decided to prioritize dark mode for the April release and push search improvements to May. John raised concerns about the current API response times, averaging 800ms for the dashboard endpoint. It was agreed that the backend team would investigate caching solutions by next Friday. Maria volunteered to create mockups for the dark mode interface by end of week. Budget allocation for Q2 was approved at $240,000, with $150,000 going to engineering resources and $90,000 to design and UX research. The next review meeting is scheduled for March 28.'",
+    "type": "summarization",
+    "expected_output_length": "medium"
+  },
+  {
+    "id": "query_018",
+    "text": "Classify this news headline into one of these categories: politics, technology, sports, entertainment, business, science, health. Headline: 'CRISPR Gene Therapy Shows Promise in Treating Sickle Cell Disease in Phase 3 Trial'",
+    "type": "classification",
+    "expected_output_length": "short"
+  },
+  {
+    "id": "query_019",
+    "text": "What are the main differences between TCP and UDP protocols?",
+    "type": "qa",
+    "expected_output_length": "medium"
+  },
+  {
+    "id": "query_020",
+    "text": "A company has three machines that produce widgets. Machine A produces 50% of all widgets with a 3% defect rate. Machine B produces 30% with a 4% defect rate. Machine C produces 20% with a 5% defect rate. If a randomly selected widget is defective, what is the probability it was produced by Machine B? Walk through the Bayesian calculation.",
+    "type": "reasoning",
+    "expected_output_length": "long"
+  },
+  {
+    "id": "query_021",
+    "text": "Write a professional email declining a job offer politely while keeping the door open for future opportunities.",
+    "type": "creative",
+    "expected_output_length": "medium"
+  },
+  {
+    "id": "query_022",
+    "text": "Write a JavaScript function that debounces another function with a configurable delay.",
+    "type": "code",
+    "expected_output_length": "medium"
+  },
+  {
+    "id": "query_023",
+    "text": "From the following financial report excerpt, extract the revenue, net income, and year-over-year growth percentages: 'For the fiscal year ending December 31, 2024, the company reported total revenue of $12.8 billion, representing a 15.3% increase from the prior year. Net income rose to $2.1 billion, a 22.7% improvement year-over-year. Operating margins expanded by 180 basis points to 18.4%. The company returned $3.2 billion to shareholders through dividends and share buybacks.'",
+    "type": "extraction",
+    "expected_output_length": "medium"
+  },
+  {
+    "id": "query_024",
+    "text": "Translate to German: 'We apologize for the inconvenience. Your order has been delayed due to unexpected shipping disruptions. We expect delivery within 3-5 business days. As a gesture of goodwill, we have applied a 15% discount to your next purchase.'",
+    "type": "translation",
+    "expected_output_length": "medium"
+  },
+  {
+    "id": "query_025",
+    "text": "Summarize the key findings from this research abstract: 'This study examined the relationship between remote work adoption and employee productivity across 500 companies in the technology sector from 2020 to 2024. Using a mixed-methods approach combining quantitative productivity metrics with qualitative employee surveys, we found that hybrid work arrangements (2-3 days remote per week) yielded the highest productivity scores, averaging 13% above fully in-office baselines. Fully remote employees showed a 7% productivity increase but reported higher rates of isolation and communication difficulties. Companies that invested in asynchronous communication tools saw 20% fewer meetings and 15% higher employee satisfaction scores. The study also found that managerial trust was the single strongest predictor of remote work success, outweighing factors like home office setup quality or internet connectivity.'",
+    "type": "summarization",
+    "expected_output_length": "medium"
+  },
+  {
+    "id": "query_026",
+    "text": "Classify these support tickets by priority (critical, high, medium, low): 1) 'Website is completely down, customers cannot place orders' 2) 'Logo appears slightly pixelated on the About page' 3) 'Payment processing failing for international credit cards' 4) 'Can you add a dark mode option to the dashboard?'",
+    "type": "classification",
+    "expected_output_length": "short"
+  },
+  {
+    "id": "query_027",
+    "text": "Why is the sky blue?",
+    "type": "qa",
+    "expected_output_length": "medium"
+  },
+  {
+    "id": "query_028",
+    "text": "Three friends -- Alice, Bob, and Charlie -- each either always tells the truth or always lies. Alice says 'Bob is a liar.' Bob says 'Charlie is a liar.' Charlie says 'Both Alice and Bob are liars.' Determine who is a truth-teller and who is a liar. Show your reasoning.",
+    "type": "reasoning",
+    "expected_output_length": "long"
+  },
+  {
+    "id": "query_029",
+    "text": "Write a compelling product description for a noise-canceling headphone aimed at remote workers. Highlight comfort, audio quality, and battery life. Keep it under 150 words.",
+    "type": "creative",
+    "expected_output_length": "medium"
+  },
+  {
+    "id": "query_030",
+    "text": "Write a bash script that monitors disk usage and sends an alert if any partition exceeds 90% capacity.",
+    "type": "code",
+    "expected_output_length": "medium"
+  },
+  {
+    "id": "query_031",
+    "text": "Extract all the action items and responsible persons from these meeting notes: 'Tom will prepare the Q3 budget report by Friday. Lisa needs to coordinate with the design team on the new logo options by next Tuesday. The marketing team (led by James) should finalize the campaign copy by March 20. Everyone should review the updated employee handbook and submit feedback to HR by end of month. Rachel will schedule one-on-one meetings with each new hire during their first week.'",
+    "type": "extraction",
+    "expected_output_length": "medium"
+  },
+  {
+    "id": "query_032",
+    "text": "Translate this customer-facing message to Japanese: 'Thank you for your purchase! Your order #45892 has been confirmed and will ship within 24 hours. You will receive a tracking number via email once your package is on its way.'",
+    "type": "translation",
+    "expected_output_length": "short"
+  },
+  {
+    "id": "query_033",
+    "text": "Provide a concise summary of the pros and cons of microservices architecture versus monolithic architecture for a mid-size SaaS application.",
+    "type": "summarization",
+    "expected_output_length": "medium"
+  },
+  {
+    "id": "query_034",
+    "text": "Classify the following text as either spam or not spam: 'CONGRATULATIONS!!! You have been selected as our LUCKY WINNER of $1,000,000! Click here NOW to claim your prize before it expires! Act FAST -- only 24 hours remaining!!! Forward this to 10 friends to double your winnings!'",
+    "type": "classification",
+    "expected_output_length": "short"
+  },
+  {
+    "id": "query_035",
+    "text": "What causes inflation and how do central banks typically respond to it?",
+    "type": "qa",
+    "expected_output_length": "medium"
+  },
+  {
+    "id": "query_036",
+    "text": "You have a 3-liter jug and a 5-liter jug. How do you measure exactly 4 liters of water? Describe each step.",
+    "type": "reasoning",
+    "expected_output_length": "medium"
+  },
+  {
+    "id": "query_037",
+    "text": "Write a limerick about a software engineer who accidentally deleted the production database.",
+    "type": "creative",
+    "expected_output_length": "short"
+  },
+  {
+    "id": "query_038",
+    "text": "Create a React component in TypeScript that implements an autocomplete search input. It should debounce API calls, show a dropdown of suggestions, handle keyboard navigation (arrow keys and Enter), and close the dropdown when clicking outside. Include proper TypeScript types.",
+    "type": "code",
+    "expected_output_length": "long"
+  },
+  {
+    "id": "query_039",
+    "text": "Extract all email addresses, phone numbers, and physical addresses from this text: 'For sales inquiries, contact John Smith at john.smith@acmecorp.com or call (555) 123-4567. Our main office is located at 1234 Innovation Drive, Suite 500, San Jose, CA 95134. For technical support, reach out to support@acmecorp.com or visit our Austin office at 5678 Tech Boulevard, Austin, TX 78701. Emergency hotline: 1-800-555-0199. European office: info@acmecorp.eu, +44 20 7946 0958.'",
+    "type": "extraction",
+    "expected_output_length": "medium"
+  },
+  {
+    "id": "query_040",
+    "text": "Translate to Mandarin Chinese: 'Our quarterly earnings exceeded analyst expectations, driven by strong growth in our cloud services division. We are raising our full-year guidance accordingly.'",
+    "type": "translation",
+    "expected_output_length": "short"
+  },
+  {
+    "id": "query_041",
+    "text": "Summarize this legal clause in plain English: 'Notwithstanding any provision to the contrary contained herein, the Indemnifying Party shall not be liable to the Indemnified Party for any indirect, consequential, special, incidental, or punitive damages, including but not limited to loss of profits, loss of revenue, loss of data, or business interruption, arising out of or in connection with this Agreement, regardless of the theory of liability (whether in contract, tort, strict liability, or otherwise), even if the Indemnifying Party has been advised of the possibility of such damages. The aggregate liability of the Indemnifying Party under this Agreement shall not exceed the total fees paid by the Indemnified Party during the twelve (12) month period immediately preceding the event giving rise to such liability.'",
+    "type": "summarization",
+    "expected_output_length": "medium"
+  },
+  {
+    "id": "query_042",
+    "text": "Is the following statement an opinion or a fact? 'The global average temperature has risen by approximately 1.1 degrees Celsius since pre-industrial times.'",
+    "type": "classification",
+    "expected_output_length": "short"
+  },
+  {
+    "id": "query_043",
+    "text": "What is the difference between machine learning and deep learning?",
+    "type": "qa",
+    "expected_output_length": "medium"
+  },
+  {
+    "id": "query_044",
+    "text": "A bat and a ball cost $1.10 in total. The bat costs $1.00 more than the ball. How much does the ball cost? Most people get this wrong -- explain why the intuitive answer is incorrect and provide the correct solution.",
+    "type": "reasoning",
+    "expected_output_length": "medium"
+  },
+  {
+    "id": "query_045",
+    "text": "Write an engaging opening paragraph for a blog post about the future of remote work in 2026.",
+    "type": "creative",
+    "expected_output_length": "medium"
+  },
+  {
+    "id": "query_046",
+    "text": "Write a Python class for a thread-safe LRU cache with a configurable maximum size. Include get and put methods with O(1) time complexity.",
+    "type": "code",
+    "expected_output_length": "long"
+  },
+  {
+    "id": "query_047",
+    "text": "Parse the following log entry and extract the timestamp, log level, service name, and error message: '[2025-03-15T14:23:45.123Z] ERROR [payment-service] Failed to process transaction txn_abc123: Connection timeout after 30000ms while connecting to payment gateway at https://api.stripe.com/v1/charges. Retry attempt 3 of 5.'",
+    "type": "extraction",
+    "expected_output_length": "short"
+  },
+  {
+    "id": "query_048",
+    "text": "Translate this marketing copy to Portuguese (Brazilian): 'Discover the power of AI-driven analytics. Our platform helps you make smarter decisions, faster. Start your free 14-day trial today and see the difference data can make for your business.'",
+    "type": "translation",
+    "expected_output_length": "short"
+  },
+  {
+    "id": "query_049",
+    "text": "Summarize the following customer feedback into themes and sentiments: 'Love the app but it crashes every time I try to upload a photo larger than 5MB. The new UI redesign looks amazing and is much more intuitive than before. I wish there was a way to export reports as PDF. The customer support team was incredibly helpful when I had a billing issue -- they resolved it within an hour. Loading times have gotten noticeably worse since the last update. The collaboration features are a game changer for our team. Please add two-factor authentication, security is important to us. Price is very reasonable compared to competitors.'",
+    "type": "summarization",
+    "expected_output_length": "medium"
+  },
+  {
+    "id": "query_050",
+    "text": "Classify each of these movie reviews as positive or negative: 1) 'A masterpiece of storytelling that had me on the edge of my seat.' 2) 'I wanted those two hours of my life back.' 3) 'Decent acting but the plot was predictable.' 4) 'An absolute waste of a talented cast.' 5) 'Not perfect, but thoroughly enjoyable and heartwarming.'",
+    "type": "classification",
+    "expected_output_length": "short"
+  },
+  {
+    "id": "query_051",
+    "text": "Explain the concept of blockchain in simple terms.",
+    "type": "qa",
+    "expected_output_length": "medium"
+  },
+  {
+    "id": "query_052",
+    "text": "A company's revenue grew by 20% in year 1, declined by 10% in year 2, grew by 15% in year 3, and declined by 5% in year 4. If the starting revenue was $1,000,000, what is the revenue at the end of year 4? What is the compound annual growth rate (CAGR) over this period?",
+    "type": "reasoning",
+    "expected_output_length": "medium"
+  },
+  {
+    "id": "query_053",
+    "text": "Write a tongue-in-cheek LinkedIn post announcing a promotion, satirizing the typical overly enthusiastic LinkedIn posting style.",
+    "type": "creative",
+    "expected_output_length": "medium"
+  },
+  {
+    "id": "query_054",
+    "text": "Write a GitHub Actions YAML workflow that runs tests on pull requests, builds a Docker image on merge to main, and pushes it to Amazon ECR.",
+    "type": "code",
+    "expected_output_length": "long"
+  },
+  {
+    "id": "query_055",
+    "text": "Extract the structured recipe data (ingredients with quantities, prep time, cook time, and steps) from this text: 'Classic Margherita Pizza -- Prep time: 20 minutes, Cook time: 12 minutes, Serves 4. You will need: 1 pound pizza dough, 1/2 cup San Marzano tomato sauce, 8 ounces fresh mozzarella (sliced), 1/4 cup fresh basil leaves, 2 tablespoons extra virgin olive oil, salt and pepper to taste. Instructions: Preheat oven to 500F with pizza stone. Stretch dough into a 12-inch circle. Spread sauce evenly, leaving a 1-inch border. Distribute mozzarella slices. Bake for 10-12 minutes until crust is golden and cheese is bubbly. Top with fresh basil and drizzle with olive oil. Season with salt and pepper. Let cool 2 minutes before slicing.'",
+    "type": "extraction",
+    "expected_output_length": "medium"
+  },
+  {
+    "id": "query_056",
+    "text": "Translate to Korean: 'Dear valued customer, we are writing to inform you that our privacy policy has been updated. The changes will take effect on April 1, 2025. Please review the updated policy on our website.'",
+    "type": "translation",
+    "expected_output_length": "short"
+  },
+  {
+    "id": "query_057",
+    "text": "Summarize the key differences between REST APIs and GraphQL in a way that would help a team decide which to use for a new project.",
+    "type": "summarization",
+    "expected_output_length": "medium"
+  },
+  {
+    "id": "query_058",
+    "text": "Classify the intent of this user query for a virtual assistant: 'Hey, can you set a reminder to pick up groceries at 5 PM and also tell me what the weather will be like tomorrow morning?'",
+    "type": "classification",
+    "expected_output_length": "short"
+  },
+  {
+    "id": "query_059",
+    "text": "What are the SOLID principles in software engineering? Give a brief example for each.",
+    "type": "qa",
+    "expected_output_length": "long"
+  },
+  {
+    "id": "query_060",
+    "text": "In a room of 30 people, what is the probability that at least two people share the same birthday? Explain the birthday paradox and walk through the calculation.",
+    "type": "reasoning",
+    "expected_output_length": "long"
+  },
+  {
+    "id": "query_061",
+    "text": "Summarize the following article about renewable energy trends: Solar installations reached record levels globally, with China leading at over 350 GW of new capacity. Wind energy grew significantly, especially offshore in Europe and Asia. Battery costs continued declining below $100/kWh. Grid infrastructure remained a bottleneck in many regions. Policy support strengthened across major economies, with a shift from direct subsidies to competitive auctions.",
+    "type": "summarization",
+    "expected_output_length": "short"
+  },
+  {
+    "id": "query_062",
+    "text": "Classify the sentiment of this review as positive, negative, or mixed: 'The camera takes amazing photos in daylight but night mode is basically unusable. For the price, I expected much better low-light performance.'",
+    "type": "classification",
+    "expected_output_length": "short"
+  },
+  {
+    "id": "query_063",
+    "text": "What's the difference between a stack and a queue?",
+    "type": "qa",
+    "expected_output_length": "medium"
+  },
+  {
+    "id": "query_064",
+    "text": "You have three jugs: 3 liters, 5 liters, and an 8-liter jug full of water. How do you divide the water into two equal portions of 4 liters each? Show your step-by-step reasoning.",
+    "type": "reasoning",
+    "expected_output_length": "long"
+  },
+  {
+    "id": "query_065",
+    "text": "Write a haiku about debugging code at 3 AM.",
+    "type": "creative",
+    "expected_output_length": "short"
+  },
+  {
+    "id": "query_066",
+    "text": "Summarize the main arguments for and against universal basic income based on recent economic research and pilot programs conducted worldwide.",
+    "type": "summarization",
+    "expected_output_length": "long"
+  },
+  {
+    "id": "query_067",
+    "text": "Determine whether the following text is AI-generated or human-written, and explain your reasoning: 'The sunset painted the sky in hues of amber and crimson, casting long shadows across the tranquil lake. A gentle breeze rustled through the willows, carrying with it the faint scent of jasmine. In that moment, time seemed to stand still, as if the universe itself had paused to appreciate the beauty of the evening.'",
+    "type": "classification",
+    "expected_output_length": "medium"
+  },
+  {
+    "id": "query_068",
+    "text": "Can you explain how vaccines work and why herd immunity matters?",
+    "type": "qa",
+    "expected_output_length": "medium"
+  },
+  {
+    "id": "query_069",
+    "text": "A store offers a 25% discount on a jacket originally priced at $120. The customer also has a coupon for an additional 10% off. If tax is 8.5%, what is the final price? Does the order in which the discounts are applied matter? Prove your answer mathematically.",
+    "type": "reasoning",
+    "expected_output_length": "medium"
+  },
+  {
+    "id": "query_070",
+    "text": "Compose a formal apology letter from an airline to a passenger whose luggage was lost during an international flight. The letter should offer specific compensation and outline the steps being taken to locate the luggage. Make it sound sincere, not corporate.",
+    "type": "creative",
+    "expected_output_length": "long"
+  },
+  {
+    "id": "query_071",
+    "text": "Implement a simple REST API in Go using the standard library that supports CRUD operations for a 'tasks' resource with fields: id, title, description, status, created_at. Include proper error handling and JSON responses.",
+    "type": "code",
+    "expected_output_length": "long"
+  },
+  {
+    "id": "query_072",
+    "text": "Extract the key metrics from this quarterly business report: 'Q4 2024 saw monthly active users reach 15.2 million, up 23% quarter-over-quarter. Customer acquisition cost decreased from $45 to $38. Average revenue per user (ARPU) increased to $12.50 from $11.20 in Q3. Churn rate improved to 2.1% from 2.8%. Net Promoter Score held steady at 72. The sales pipeline grew to $45M with a 35% conversion rate. Customer lifetime value is now estimated at $595.'",
+    "type": "extraction",
+    "expected_output_length": "medium"
+  },
+  {
+    "id": "query_073",
+    "text": "Translate this error message to Italian, maintaining the technical terminology: 'Error 503: Service Unavailable. The server is temporarily unable to handle your request due to maintenance or capacity issues. Please try again in a few minutes. If the problem persists, contact our technical support team.'",
+    "type": "translation",
+    "expected_output_length": "short"
+  },
+  {
+    "id": "query_074",
+    "text": "Provide a brief summary of how CRISPR gene editing technology works and its potential medical applications.",
+    "type": "summarization",
+    "expected_output_length": "medium"
+  },
+  {
+    "id": "query_075",
+    "text": "Categorize these customer complaints by department (product, shipping, billing, customer service): 'The widget broke after two days of normal use.' 'I was charged twice for the same order.' 'The delivery arrived a week late with no updates.' 'The support agent was rude and unhelpful.' 'The color of the item doesn't match the website photo.' 'My refund still hasn't been processed after 30 days.'",
+    "type": "classification",
+    "expected_output_length": "medium"
+  },
+  {
+    "id": "query_076",
+    "text": "What is the difference between correlation and causation? Give a real-world example.",
+    "type": "qa",
+    "expected_output_length": "medium"
+  },
+  {
+    "id": "query_077",
+    "text": "Five pirates have found 100 gold coins. They must divide the treasure according to these rules: the most senior pirate proposes a split. All pirates vote. If at least half vote yes, the split is accepted. If not, the proposer is thrown overboard and the next most senior pirate proposes. Pirates are perfectly logical and want to maximize their gold, but also prefer to throw others overboard if the gold outcome is the same. What split does the most senior pirate propose to survive and maximize gold?",
+    "type": "reasoning",
+    "expected_output_length": "long"
+  },
+  {
+    "id": "query_078",
+    "text": "Write a witty out-of-office auto-reply email for a developer going on vacation for two weeks.",
+    "type": "creative",
+    "expected_output_length": "short"
+  },
+  {
+    "id": "query_079",
+    "text": "Write a Python decorator that retries a function up to N times with exponential backoff when it raises specific exception types. Include configurable initial delay and maximum delay parameters.",
+    "type": "code",
+    "expected_output_length": "medium"
+  },
+  {
+    "id": "query_080",
+    "text": "From the following job posting, extract the required qualifications, preferred qualifications, salary range, and location: 'Senior Data Engineer -- San Francisco, CA (Hybrid). Salary: $165,000 - $210,000 + equity. Required: 5+ years data engineering experience, strong SQL and Python skills, experience with Spark or similar distributed processing frameworks, familiarity with cloud platforms (AWS/GCP/Azure), bachelor's degree in CS or related field. Preferred: Experience with dbt, Airflow, or Dagster, knowledge of streaming systems like Kafka, master's degree, prior startup experience. Benefits include health insurance, 401k matching, unlimited PTO, and $5,000 annual learning stipend.'",
+    "type": "extraction",
+    "expected_output_length": "medium"
+  },
+  {
+    "id": "query_081",
+    "text": "Translate this medical information to Arabic: 'Take one tablet twice daily with food. Do not exceed the recommended dosage. Common side effects may include nausea, headache, and dizziness. Consult your doctor if symptoms persist for more than 48 hours.'",
+    "type": "translation",
+    "expected_output_length": "short"
+  },
+  {
+    "id": "query_082",
+    "text": "Summarize the following incident report in 2-3 sentences: 'At 14:32 UTC on March 10, 2025, our monitoring systems detected a significant increase in 5xx errors on the payment processing service. Investigation revealed that a database migration deployed at 14:15 UTC had inadvertently dropped an index on the transactions table, causing query timeouts. The on-call engineer identified the issue at 14:45 UTC and initiated a rollback of the migration. Service was fully restored at 15:02 UTC. Total impact: approximately 30 minutes of degraded service affecting an estimated 2,400 transactions. 340 transactions failed and required manual retry. No data was lost. Root cause: insufficient testing of migration in staging environment, which had a smaller dataset that did not reveal the performance impact.'",
+    "type": "summarization",
+    "expected_output_length": "short"
+  },
+  {
+    "id": "query_083",
+    "text": "Is this a phishing attempt? Analyze the following email: 'From: security@paypa1.com Subject: Your account has been limited. Dear customer, we have noticed unusual activity on your account. Please verify your identity by clicking the link below within 24 hours or your account will be permanently suspended. [Verify Now]. PayPal Security Team'",
+    "type": "classification",
+    "expected_output_length": "medium"
+  },
+  {
+    "id": "query_084",
+    "text": "How does a neural network learn? Explain backpropagation at a high level.",
+    "type": "qa",
+    "expected_output_length": "medium"
+  },
+  {
+    "id": "query_085",
+    "text": "There are 12 balls, 11 identical in weight and one that is either heavier or lighter. Using a balance scale exactly 3 times, how do you identify the odd ball and determine whether it is heavier or lighter? Describe the complete decision tree.",
+    "type": "reasoning",
+    "expected_output_length": "long"
+  },
+  {
+    "id": "query_086",
+    "text": "Create a vivid, sensory-rich description of a bustling Tokyo fish market at dawn. Use all five senses. Keep it under 200 words.",
+    "type": "creative",
+    "expected_output_length": "medium"
+  },
+  {
+    "id": "query_087",
+    "text": "Write a Dockerfile for a Node.js application that uses multi-stage builds, runs as a non-root user, and follows security best practices. Include comments explaining each decision.",
+    "type": "code",
+    "expected_output_length": "medium"
+  },
+  {
+    "id": "query_088",
+    "text": "Extract and structure the nutritional information from this food label text: 'Serving Size 1 cup (240mL). Servings Per Container: About 8. Calories 150, Total Fat 8g (10% DV), Saturated Fat 5g (25% DV), Trans Fat 0g, Cholesterol 30mg (10% DV), Sodium 170mg (7% DV), Total Carbohydrate 13g (5% DV), Dietary Fiber 0g (0% DV), Total Sugars 12g (includes 10g Added Sugars, 20% DV), Protein 8g, Vitamin D 2.5mcg (15% DV), Calcium 300mg (25% DV), Iron 0mg (0% DV), Potassium 350mg (8% DV).'",
+    "type": "extraction",
+    "expected_output_length": "medium"
+  },
+  {
+    "id": "query_089",
+    "text": "Translate this conversational dialogue to Hindi, preserving the informal tone: 'A: Hey, are you coming to the party tonight? B: I'm not sure, I have a lot of work to finish. A: Come on, you need a break! It'll be fun. B: Alright, you've convinced me. What time should I be there? A: Around 8 PM. Don't forget to bring some snacks!'",
+    "type": "translation",
+    "expected_output_length": "medium"
+  },
+  {
+    "id": "query_090",
+    "text": "Summarize the evolution of JavaScript frameworks over the last decade, covering the rise of Angular, React, Vue, and Svelte, and where things are heading.",
+    "type": "summarization",
+    "expected_output_length": "long"
+  },
+  {
+    "id": "query_091",
+    "text": "Classify the reading level of this text (elementary, middle school, high school, college, graduate): 'The epistemological implications of quantum entanglement challenge our fundamental presuppositions about locality and realism. Bell's theorem, experimentally validated through Aspect's seminal experiments, demonstrates that no local hidden variable theory can reproduce the statistical predictions of quantum mechanics, thereby necessitating a reconceptualization of our ontological framework.'",
+    "type": "classification",
+    "expected_output_length": "short"
+  },
+  {
+    "id": "query_092",
+    "text": "What are the pros and cons of using NoSQL databases versus relational databases?",
+    "type": "qa",
+    "expected_output_length": "medium"
+  },
+  {
+    "id": "query_093",
+    "text": "A train leaves Station A heading east at 60 km/h. Two hours later, another train leaves Station A heading east at 90 km/h. At the same time the second train departs, a third train leaves Station B (which is 500 km east of A) heading west at 75 km/h. Which train does the third train encounter first, and at what time and location?",
+    "type": "reasoning",
+    "expected_output_length": "long"
+  },
+  {
+    "id": "query_094",
+    "text": "Write an engaging elevator pitch for a startup that uses AI to match volunteers with local nonprofit organizations based on their skills, interests, and availability.",
+    "type": "creative",
+    "expected_output_length": "short"
+  },
+  {
+    "id": "query_095",
+    "text": "Write a Rust function that reads a CSV file and returns the top N rows sorted by a specified column. Use proper error handling with the Result type.",
+    "type": "code",
+    "expected_output_length": "long"
+  },
+  {
+    "id": "query_096",
+    "text": "Extract all the technical specifications from this product listing: 'MacBook Pro 16-inch (2024) -- Apple M3 Max chip with 16-core CPU and 40-core GPU. 48GB unified memory. 1TB SSD storage. 16.2-inch Liquid Retina XDR display, 3456x2234 native resolution, 120Hz ProMotion adaptive refresh rate, 1000 nits sustained brightness, 1600 nits peak HDR. Three Thunderbolt 4 ports, HDMI port, SDXC card slot, MagSafe 3 charging port, headphone jack. 140W USB-C power adapter. Wi-Fi 6E, Bluetooth 5.3. Weight: 2.14 kg. Battery: up to 22 hours video playback. Space Black finish.'",
+    "type": "extraction",
+    "expected_output_length": "medium"
+  },
+  {
+    "id": "query_097",
+    "text": "Translate this legal disclaimer to French, maintaining formal register: 'This document is provided for informational purposes only and does not constitute legal, financial, or professional advice. The information contained herein is subject to change without notice. We make no warranties, express or implied, regarding the accuracy, completeness, or reliability of this information.'",
+    "type": "translation",
+    "expected_output_length": "medium"
+  },
+  {
+    "id": "query_098",
+    "text": "Summarize the following quarterly earnings call highlights into a brief executive summary suitable for a board presentation: 'CEO opened by noting record revenue of $4.8B, beating consensus estimates by $200M. Gross margins expanded 250bps to 72.4% driven by favorable product mix and manufacturing efficiencies. Operating expenses grew 8% YoY but declined as a percentage of revenue from 45% to 42%. The company added 1,200 enterprise customers in Q4, bringing the total to 18,500. Net dollar retention rate remained strong at 118%. International revenue grew 35% YoY and now represents 42% of total revenue, up from 36% a year ago. Free cash flow was $1.2B with a 25% FCF margin. The company raised FY2025 guidance to $20.5-21.0B in revenue. CFO noted plans to accelerate stock buybacks, authorizing an additional $5B repurchase program. Two key risks were highlighted: potential macroeconomic headwinds in Europe and ongoing regulatory uncertainty in China.'",
+    "type": "summarization",
+    "expected_output_length": "medium"
+  },
+  {
+    "id": "query_099",
+    "text": "Classify the following customer interactions by whether they require human escalation or can be handled by an automated system: 1) 'What are your store hours?' 2) 'I want to sue your company for negligence.' 3) 'How do I reset my password?' 4) 'I'm feeling very distressed and need someone to talk to.' 5) 'Can I track my order?' 6) 'Your product caused a safety hazard in my home.'",
+    "type": "classification",
+    "expected_output_length": "medium"
+  },
+  {
+    "id": "query_100",
+    "text": "I have a dataset with 50,000 rows of customer purchase data including columns for customer_id, purchase_date, product_category, amount, and region. I want to identify customer segments for a targeted marketing campaign. Walk me through the analytical approach you would take, including data preprocessing steps, which clustering algorithms to consider, how to determine the optimal number of clusters, and how to interpret and validate the results. Also suggest what visualizations would be most useful for presenting the findings to non-technical stakeholders.",
+    "type": "reasoning",
+    "expected_output_length": "long"
+  }
+]

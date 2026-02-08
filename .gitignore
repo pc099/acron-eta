@@ -1,0 +1,7 @@
+.env
+asahi/
+__pycache__/
+*.pyc
+.pytest_cache/
+data/baseline_results.json
+data/optimized_results.json
