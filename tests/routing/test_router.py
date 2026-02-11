@@ -5,8 +5,9 @@ Tests for the routing engine.
 import pytest
 
 from src.exceptions import NoModelsAvailableError
-from src.models import ModelProfile, ModelRegistry
-from src.routing import Router, RoutingConstraints, RoutingDecision
+from src.models.registry import ModelProfile, ModelRegistry
+from src.routing.constraints import RoutingConstraints, RoutingDecision
+from src.routing.router import Router
 
 
 @pytest.fixture

@@ -7,7 +7,7 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from src.cache import Cache, CacheEntry, CacheStats
+from src.cache.exact import Cache, CacheEntry, CacheStats
 
 
 class TestCacheEntry:

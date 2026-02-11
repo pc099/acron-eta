@@ -9,7 +9,7 @@ import pytest
 from pydantic import ValidationError
 
 from src.exceptions import ConfigurationError, ModelNotFoundError
-from src.models import ModelProfile, ModelRegistry, calculate_cost, estimate_tokens
+from src.models.registry import ModelProfile, ModelRegistry, calculate_cost, estimate_tokens
 
 
 # ---------------------------------------------------------------------------

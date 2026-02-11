@@ -10,11 +10,12 @@ import os
 
 import pytest
 
-from src.cache import Cache
-from src.models import ModelRegistry
-from src.optimizer import InferenceOptimizer, InferenceResult
-from src.routing import Router
-from src.tracking import EventTracker
+from src.cache.exact import Cache
+from src.models.registry import ModelProfile, ModelRegistry
+from src.core.optimizer import InferenceOptimizer, InferenceResult
+from src.routing.constraints import RoutingConstraints
+from src.routing.router import Router
+from src.tracking.tracker import EventTracker
 
 
 @pytest.fixture
@@ -281,7 +282,7 @@ def from_profile(
     output_cost: float,
 ) -> "ModelProfile":
     """Helper to create a ModelProfile for tests."""
-    from src.models import ModelProfile
+    from src.models.registry import ModelProfile
 
     return ModelProfile(
         name=name,

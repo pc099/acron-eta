@@ -16,16 +16,17 @@ from typing import Optional, Tuple
 from dotenv import load_dotenv
 from pydantic import BaseModel, Field
 
-from src.cache import Cache, CacheEntry
+from src.cache.exact import Cache, CacheEntry
 from src.exceptions import ModelNotFoundError, ProviderError
-from src.models import (
+from src.models.registry import (
     ModelProfile,
     ModelRegistry,
     calculate_cost,
     estimate_tokens,
 )
-from src.routing import Router, RoutingConstraints, RoutingDecision
-from src.tracking import EventTracker, InferenceEvent
+from src.routing.constraints import RoutingConstraints, RoutingDecision
+from src.routing.router import Router
+from src.tracking.tracker import EventTracker, InferenceEvent
 
 load_dotenv()
 
@@ -104,16 +105,6 @@ class InferenceOptimizer:
     ) -> InferenceResult:
         """Run a full inference request through the optimization pipeline.
 
-        Steps:
-        1. Generate request_id
-        2. Check cache
-        3. Route to best model
-        4. Execute inference
-        5. Calculate cost
-        6. Cache the result
-        7. Log the event
-        8. Return structured result
-
         Args:
             prompt: The user query.
             task_id: Optional task identifier for tracking.
@@ -180,7 +171,6 @@ class InferenceOptimizer:
                 self._execute_inference(decision.model_name, prompt)
             )
         except ProviderError:
-            # Attempt fallback to highest-quality model
             logger.warning(
                 "Primary model failed, attempting fallback",
                 extra={
@@ -281,25 +271,11 @@ class InferenceOptimizer:
     # ------------------------------------------------------------------
 
     def _check_cache(self, prompt: str) -> Optional[CacheEntry]:
-        """Delegate cache lookup to the cache component.
-
-        Args:
-            prompt: User query to look up.
-
-        Returns:
-            CacheEntry on hit, None on miss.
-        """
+        """Delegate cache lookup to the cache component."""
         return self._cache.get(prompt)
 
     def _route(self, constraints: RoutingConstraints) -> RoutingDecision:
-        """Delegate model selection to the router.
-
-        Args:
-            constraints: Quality/latency/cost constraints.
-
-        Returns:
-            RoutingDecision with the selected model.
-        """
+        """Delegate model selection to the router."""
         return self._router.select_model(constraints)
 
     def _execute_inference(
@@ -357,15 +333,7 @@ class InferenceOptimizer:
     def _call_openai(
         self, model_name: str, prompt: str
     ) -> Tuple[str, int, int, int]:
-        """Call the OpenAI API.
-
-        Args:
-            model_name: OpenAI model identifier.
-            prompt: User query.
-
-        Returns:
-            Tuple of (response_text, input_tokens, output_tokens, latency_ms).
-        """
+        """Call the OpenAI API."""
         from openai import OpenAI
 
         start = time.time()
@@ -390,15 +358,7 @@ class InferenceOptimizer:
     def _call_anthropic(
         self, model_name: str, prompt: str
     ) -> Tuple[str, int, int, int]:
-        """Call the Anthropic API.
-
-        Args:
-            model_name: Anthropic model identifier.
-            prompt: User query.
-
-        Returns:
-            Tuple of (response_text, input_tokens, output_tokens, latency_ms).
-        """
+        """Call the Anthropic API."""
         import anthropic
 
         start = time.time()
@@ -425,17 +385,8 @@ class InferenceOptimizer:
     def _mock_call(
         self, model_name: str, prompt: str
     ) -> Tuple[str, int, int, int]:
-        """Simulate an API call with realistic latency and token counts.
-
-        Args:
-            model_name: Model to simulate.
-            prompt: User query.
-
-        Returns:
-            Tuple of (response_text, input_tokens, output_tokens, latency_ms).
-        """
+        """Simulate an API call with realistic latency and token counts."""
         profile = self._registry.get(model_name)
-        # Simulate some latency (scaled down for tests)
         base_latency = profile.avg_latency_ms / 1000
         jitter = random.uniform(0.8, 1.2)
         time.sleep(base_latency * jitter * 0.01)
@@ -464,20 +415,7 @@ class InferenceOptimizer:
         task_type: Optional[str] = None,
         user_id: Optional[str] = None,
     ) -> None:
-        """Create and log an InferenceEvent.
-
-        Args:
-            request_id: Unique request identifier.
-            event_model: Model that handled the request.
-            cache_hit: Whether cache was used.
-            input_tokens: Token count in.
-            output_tokens: Token count out.
-            latency_ms: End-to-end latency.
-            cost: Dollar cost.
-            routing_reason: Reason for model selection.
-            task_type: Optional task category.
-            user_id: Optional caller identity.
-        """
+        """Create and log an InferenceEvent."""
         event = InferenceEvent(
             request_id=request_id,
             model_selected=event_model,
@@ -496,16 +434,7 @@ class InferenceOptimizer:
     def _calculate_cost(
         self, model_name: str, input_tokens: int, output_tokens: int
     ) -> float:
-        """Calculate cost using the registry.
-
-        Args:
-            model_name: Model to look up pricing for.
-            input_tokens: Number of input tokens.
-            output_tokens: Number of output tokens.
-
-        Returns:
-            Dollar cost.
-        """
+        """Calculate cost using the registry."""
         try:
             profile = self._registry.get(model_name)
             return calculate_cost(profile, input_tokens, output_tokens)

@@ -7,7 +7,7 @@ phase1_requirements.md specification.
 
 from fastapi.testclient import TestClient
 
-from src.api import create_app
+from src.api.app import create_app
 
 
 class TestAcceptanceCriteria:

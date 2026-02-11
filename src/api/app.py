@@ -1,169 +1,29 @@
 """
-FastAPI REST API for Asahi inference optimizer.
+FastAPI application factory for Asahi inference optimizer.
 
-Endpoints:
-    POST /infer   - Run inference with smart routing and caching
-    GET  /metrics - View cost/latency/quality analytics
-    GET  /models  - List available models with pricing
-    GET  /health  - Service health check
+Creates and configures the FastAPI app with all routes, middleware,
+and shared state.
 """
 
 import logging
 import time
 import uuid
-from collections import defaultdict
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
 from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field
 
+from src.api.middleware import RateLimiter
+from src.api.schemas import (
+    ErrorResponse,
+    HealthResponse,
+    InferRequest,
+    InferResponse,
+)
+from src.core.optimizer import InferenceOptimizer, InferenceResult
 from src.exceptions import NoModelsAvailableError, ProviderError
-from src.optimizer import InferenceOptimizer, InferenceResult
 
 logger = logging.getLogger(__name__)
-
-
-# ---------------------------------------------------------------------------
-# Request / Response Schemas
-# ---------------------------------------------------------------------------
-
-
-class InferRequest(BaseModel):
-    """Incoming inference request body.
-
-    Attributes:
-        prompt: User query (1-100000 characters).
-        task_id: Optional task identifier for tracking.
-        latency_budget_ms: Maximum acceptable latency in milliseconds.
-        quality_threshold: Minimum quality score (0.0-5.0).
-        cost_budget: Optional maximum dollar cost for this request.
-        user_id: Optional caller identity.
-    """
-
-    prompt: str = Field(
-        ..., min_length=1, max_length=100000, description="User query"
-    )
-    task_id: Optional[str] = Field(
-        default=None, description="Optional task identifier"
-    )
-    latency_budget_ms: int = Field(
-        default=300, ge=50, le=30000, description="Max latency in ms"
-    )
-    quality_threshold: float = Field(
-        default=3.5, ge=0.0, le=5.0, description="Min quality score"
-    )
-    cost_budget: Optional[float] = Field(
-        default=None, ge=0.0, description="Max dollar cost"
-    )
-    user_id: Optional[str] = Field(
-        default=None, description="Caller identity"
-    )
-
-
-class InferResponse(BaseModel):
-    """Inference result returned to the caller.
-
-    Attributes:
-        request_id: Unique request identifier for tracing.
-        response: The LLM response text.
-        model_used: Selected model name.
-        tokens_input: Input token count.
-        tokens_output: Output token count.
-        cost: Dollar cost for this request.
-        latency_ms: End-to-end latency in milliseconds.
-        cache_hit: Whether the result came from cache.
-        routing_reason: Explanation of model choice.
-    """
-
-    request_id: str
-    response: str = ""
-    model_used: str = ""
-    tokens_input: int = 0
-    tokens_output: int = 0
-    cost: float = 0.0
-    latency_ms: float = 0.0
-    cache_hit: bool = False
-    routing_reason: str = ""
-
-
-class HealthResponse(BaseModel):
-    """Health check response.
-
-    Attributes:
-        status: Service health status.
-        version: API version string.
-        uptime_seconds: Seconds since service start.
-        components: Health status of sub-components.
-    """
-
-    status: str
-    version: str
-    uptime_seconds: float
-    components: Dict[str, str] = {}
-
-
-class ErrorResponse(BaseModel):
-    """Standard error body.
-
-    Attributes:
-        error: Error type identifier.
-        message: Human-readable error description.
-        request_id: Request ID for correlation.
-    """
-
-    error: str
-    message: str
-    request_id: Optional[str] = None
-
-
-# ---------------------------------------------------------------------------
-# Rate limiter (simple in-memory, per-IP)
-# ---------------------------------------------------------------------------
-
-
-class RateLimiter:
-    """Simple in-memory rate limiter using a sliding window.
-
-    Args:
-        max_requests: Maximum requests per window.
-        window_seconds: Window size in seconds.
-    """
-
-    def __init__(
-        self, max_requests: int = 100, window_seconds: int = 60
-    ) -> None:
-        self._max_requests = max_requests
-        self._window_seconds = window_seconds
-        self._requests: Dict[str, list] = defaultdict(list)
-
-    def is_allowed(self, client_id: str) -> bool:
-        """Check if a request from this client is allowed.
-
-        Args:
-            client_id: Client identifier (e.g. IP address).
-
-        Returns:
-            True if the request is within the rate limit.
-        """
-        now = time.time()
-        window_start = now - self._window_seconds
-
-        # Clean up old entries
-        self._requests[client_id] = [
-            t for t in self._requests[client_id] if t > window_start
-        ]
-
-        if len(self._requests[client_id]) >= self._max_requests:
-            return False
-
-        self._requests[client_id].append(now)
-        return True
-
-
-# ---------------------------------------------------------------------------
-# App factory
-# ---------------------------------------------------------------------------
 
 
 def create_app(use_mock: bool = False) -> FastAPI:
@@ -237,11 +97,7 @@ def create_app(use_mock: bool = False) -> FastAPI:
         summary="Run inference with smart routing and caching",
     )
     async def infer(body: InferRequest, request: Request) -> InferResponse:
-        """Run an inference request through Asahi's optimizer.
-
-        The optimizer checks the cache, routes to the best model, executes
-        inference, logs the event, and returns a structured response.
-        """
+        """Run an inference request through Asahi's optimizer."""
         optimizer: InferenceOptimizer = request.app.state.optimizer
         request_id: str = getattr(
             request.state, "request_id", uuid.uuid4().hex[:12]

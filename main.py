@@ -14,7 +14,7 @@ import json
 import os
 import sys
 
-from src.optimizer import InferenceOptimizer
+from src.core.optimizer import InferenceOptimizer
 
 
 def cmd_infer(args: argparse.Namespace) -> None:
@@ -76,7 +76,6 @@ def cmd_benchmark(args: argparse.Namespace) -> None:
     n = min(args.num_queries, len(queries))
     print(f"Benchmarking {n} queries (mock={args.mock})...\n")
 
-    # Baseline: all GPT-4 -- use high quality threshold but no routing
     print("=== BASELINE (All GPT-4-Turbo) ===")
     baseline = InferenceOptimizer(use_mock=args.mock)
     for i, query in enumerate(queries[:n]):
@@ -84,13 +83,12 @@ def cmd_benchmark(args: argparse.Namespace) -> None:
             prompt=query["text"],
             task_id=f"baseline_{query['id']}",
             latency_budget_ms=9999,
-            quality_threshold=4.6,  # forces GPT-4
+            quality_threshold=4.6,
         )
         if (i + 1) % 10 == 0:
             print(f"  Baseline: {i + 1}/{n}")
     baseline_metrics = baseline.get_metrics()
 
-    # Optimized: smart routing
     print("\n=== OPTIMIZED (Smart Routing) ===")
     optimized = InferenceOptimizer(use_mock=args.mock)
     for i, query in enumerate(queries[:n]):
@@ -147,7 +145,7 @@ def cmd_metrics(args: argparse.Namespace) -> None:
 def cmd_api(args: argparse.Namespace) -> None:
     """Start the FastAPI REST API server."""
     import uvicorn
-    from src.api import create_app
+    from src.api.app import create_app
 
     app = create_app(use_mock=args.mock)
     print(f"Starting Asahi API on port {args.port} (mock={args.mock})")
@@ -161,29 +159,24 @@ def main() -> None:
     )
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
 
-    # infer
     p_infer = subparsers.add_parser("infer", help="Run single inference")
     p_infer.add_argument("--prompt", required=True, help="Input prompt")
     p_infer.add_argument("--quality", type=float, default=3.5)
     p_infer.add_argument("--latency", type=int, default=300)
     p_infer.add_argument("--mock", action="store_true", help="Use mock inference")
 
-    # test
     p_test = subparsers.add_parser("test", help="Run test queries")
     p_test.add_argument("--num_queries", type=int, default=50)
     p_test.add_argument("--quality", type=float, default=3.5)
     p_test.add_argument("--latency", type=int, default=300)
     p_test.add_argument("--mock", action="store_true", help="Use mock inference")
 
-    # benchmark
     p_bench = subparsers.add_parser("benchmark", help="Baseline vs optimized")
     p_bench.add_argument("--num_queries", type=int, default=50)
     p_bench.add_argument("--mock", action="store_true", help="Use mock inference")
 
-    # metrics
     subparsers.add_parser("metrics", help="Show saved metrics")
 
-    # api
     p_api = subparsers.add_parser("api", help="Start REST API server")
     p_api.add_argument("--port", type=int, default=8000)
     p_api.add_argument("--mock", action="store_true", help="Use mock inference")

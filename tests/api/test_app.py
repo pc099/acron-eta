@@ -7,7 +7,7 @@ Uses FastAPI's TestClient (backed by httpx) for synchronous testing.
 import pytest
 from fastapi.testclient import TestClient
 
-from src.api import create_app
+from src.api.app import create_app
 
 
 @pytest.fixture

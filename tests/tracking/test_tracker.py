@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from src.tracking import EventTracker, InferenceEvent
+from src.tracking.tracker import EventTracker, InferenceEvent
 
 
 class TestInferenceEvent:

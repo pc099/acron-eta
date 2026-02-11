@@ -86,7 +86,6 @@ class EventTracker:
         """
         self._events.append(event)
 
-        # Persist to daily JSONL
         date_str = event.timestamp.strftime("%Y-%m-%d")
         filename = f"events_{date_str}.jsonl"
         filepath = self._log_dir / filename
@@ -113,9 +112,7 @@ class EventTracker:
         """Compute aggregate analytics across all tracked events.
 
         Returns:
-            Dict containing: ``total_cost``, ``requests``, ``avg_latency_ms``,
-            ``cache_hit_rate``, ``cost_by_model``, ``savings_vs_baseline``,
-            and more.
+            Dict containing analytics summary.
         """
         if not self._events:
             return {
@@ -136,7 +133,6 @@ class EventTracker:
         cache_hits = sum(1 for e in self._events if e.cache_hit)
         cache_hit_rate = cache_hits / requests
 
-        # Aggregate by model
         cost_by_model: Dict[str, float] = {}
         requests_by_model: Dict[str, int] = {}
         for event in self._events:
@@ -144,9 +140,8 @@ class EventTracker:
             cost_by_model[model] = cost_by_model.get(model, 0.0) + event.cost
             requests_by_model[model] = requests_by_model.get(model, 0) + 1
 
-        # Baseline comparison: what would GPT-4 Turbo have cost?
-        gpt4_input_rate = 0.010  # per 1k tokens
-        gpt4_output_rate = 0.030  # per 1k tokens
+        gpt4_input_rate = 0.010
+        gpt4_output_rate = 0.030
         gpt4_total = sum(
             (e.input_tokens * gpt4_input_rate + e.output_tokens * gpt4_output_rate)
             / 1000
@@ -184,7 +179,6 @@ class EventTracker:
         events = self._events
         if since is not None:
             events = [e for e in events if e.timestamp >= since]
-        # Return newest first
         return list(reversed(events[-limit:]))
 
     def load_from_file(self, path: Path) -> None:
@@ -246,7 +240,6 @@ class EventTracker:
             writer.writeheader()
             for event in self._events:
                 row = event.model_dump()
-                # Convert datetime to ISO string for CSV
                 row["timestamp"] = event.timestamp.isoformat()
                 writer.writerow(row)
 
