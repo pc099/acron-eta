@@ -1,0 +1,29 @@
+# Asahi Application Configuration
+# Override any value via environment variable prefixed with ASAHI_
+
+api:
+  host: "0.0.0.0"
+  port: 8000
+  cors_origins:
+    - "*"
+  rate_limit_per_minute: 100
+  version: "1.0.0"
+
+cache:
+  ttl_seconds: 86400           # 24 hours
+  max_entries: 10000
+  cleanup_interval_seconds: 300  # 5 minutes
+
+routing:
+  default_quality_threshold: 3.5
+  default_latency_budget_ms: 300
+
+tracking:
+  log_dir: "data/logs"
+  enable_kafka: false
+  kafka_bootstrap_servers: "localhost:9092"
+  kafka_topic: "asahi_inference_events"
+
+logging:
+  level: "INFO"
+  format: "json"

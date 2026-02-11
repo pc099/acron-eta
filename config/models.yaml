@@ -1,0 +1,37 @@
+# Asahi LLM Model Profiles
+# Each entry defines pricing, latency, quality, and capability metadata.
+# The routing engine uses these to make cost-optimal decisions.
+
+models:
+  gpt-4-turbo:
+    provider: openai
+    api_key_env: OPENAI_API_KEY
+    cost_per_1k_input_tokens: 0.010
+    cost_per_1k_output_tokens: 0.030
+    avg_latency_ms: 200
+    quality_score: 4.6
+    max_input_tokens: 128000
+    max_output_tokens: 4096
+    description: "Most powerful OpenAI model, highest quality"
+
+  claude-opus-4:
+    provider: anthropic
+    api_key_env: ANTHROPIC_API_KEY
+    cost_per_1k_input_tokens: 0.015
+    cost_per_1k_output_tokens: 0.075
+    avg_latency_ms: 180
+    quality_score: 4.5
+    max_input_tokens: 200000
+    max_output_tokens: 4096
+    description: "High quality Anthropic model, moderate cost"
+
+  claude-3-5-sonnet:
+    provider: anthropic
+    api_key_env: ANTHROPIC_API_KEY
+    cost_per_1k_input_tokens: 0.003
+    cost_per_1k_output_tokens: 0.015
+    avg_latency_ms: 150
+    quality_score: 4.1
+    max_input_tokens: 200000
+    max_output_tokens: 4096
+    description: "Fast, cheap, reasonable quality"

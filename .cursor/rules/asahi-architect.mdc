@@ -1,0 +1,439 @@
+---
+description: Asahi project architect -- generates production-grade code for each component by referencing phase specifications, enforcing quality standards, and following the established data model contracts.
+globs:
+  - "src/**/*.py"
+  - "tests/**/*.py"
+  - "config/**/*.yaml"
+alwaysApply: false
+---
+
+# Asahi Project Architect
+
+You are building **Asahi**, an LLM inference cost optimization platform designed as a production SaaS product. This is NOT a side project -- every file you produce must be client-ready, fully typed, fully tested, and documented.
+
+## Project Structure
+
+Folders are organised by **domain/concern**, not by phase number. This keeps the codebase navigable as features ship incrementally.
+
+```
+src/
+  __init__.py
+  exceptions.py              # AsahiException hierarchy (shared by all modules)
+  config.py                  # Config loading, validation, env-var resolution
+
+  core/                      # Central orchestration
+    __init__.py
+    optimizer.py             # InferenceOptimizer -- the main entry point that wires
+                             #   cache → routing → inference → tracking together
+
+  models/                    # Model registry and LLM provider adapters
+    __init__.py
+    registry.py              # ModelRegistry, ModelProfile
+    providers.py             # OpenAI, Anthropic, Mistral adapter functions
+
+  routing/                   # Routing engine (basic + advanced 3-mode router)
+    __init__.py
+    router.py                # Router (filter-score-select) + AdvancedRouter (3 modes)
+    task_detector.py         # TaskTypeDetector (keyword/pattern-based intent detection)
+    constraints.py           # ConstraintInterpreter, RoutingConstraints, RoutingDecision
+
+  cache/                     # Multi-tier caching (Tier 1 / 2 / 3)
+    __init__.py
+    exact.py                 # Tier 1: ExactMatchCache (MD5 hash, TTL-based)
+    semantic.py              # Tier 2: SemanticCache orchestrator
+    intermediate.py          # Tier 3: IntermediateCache orchestrator
+    workflow.py              # WorkflowDecomposer, WorkflowStep
+
+  embeddings/                # Embedding infrastructure for semantic operations
+    __init__.py
+    engine.py                # EmbeddingEngine (Cohere / OpenAI / Ollama)
+    contextual.py            # ContextualEmbeddingEngine (Haiku context generation)
+    similarity.py            # SimilarityCalculator (cosine similarity, batch ops)
+    mismatch.py              # MismatchCostCalculator (cache-vs-recompute economics)
+    threshold.py             # AdaptiveThresholdTuner (per-task, per-sensitivity)
+    vector_store.py          # VectorDatabase Protocol, InMemoryVectorDB, PineconeVectorDB
+
+  batching/                  # Request batching (deadline-aware grouping)
+    __init__.py
+    engine.py                # BatchEngine (eligibility check)
+    queue.py                 # RequestQueue (thread-safe, grouped by batch key)
+    scheduler.py             # BatchScheduler (background loop, size/deadline triggers)
+
+  optimization/              # Token optimization (prompt compression)
+    __init__.py
+    analyzer.py              # ContextAnalyzer (segment relevance scoring)
+    compressor.py            # PromptCompressor (extractive / abstractive / template)
+    few_shot.py              # FewShotSelector (relevance + diversity)
+    optimizer.py             # TokenOptimizer (pipeline orchestrator)
+
+  features/                  # Feature store integration
+    __init__.py
+    client.py                # FeatureStoreClient Protocol, FeastClient, LocalFeatureStore
+    enricher.py              # FeatureEnricher (task-aware context injection)
+    monitor.py               # FeatureMonitor (freshness, quality delta tracking)
+
+  observability/             # Enterprise observability & analytics
+    __init__.py
+    metrics.py               # MetricsCollector (Prometheus counters/gauges/histograms)
+    analytics.py             # AnalyticsEngine (cost breakdown, trends, comparisons)
+    forecasting.py           # ForecastingModel (EMA + linear regression)
+    anomaly.py               # AnomalyDetector (cost/latency/error/cache/quality)
+    recommendations.py       # RecommendationEngine (actionable suggestions)
+
+  governance/                # Enterprise auth, compliance, and multi-tenancy
+    __init__.py
+    auth.py                  # AuthMiddleware (API key, OAuth2, SAML)
+    rbac.py                  # GovernanceEngine, Role, OrganizationPolicy
+    audit.py                 # AuditLogger (immutable hash-chain log)
+    compliance.py            # ComplianceManager (HIPAA, SOC2, GDPR, PII redaction)
+    encryption.py            # EncryptionManager (AES-256-GCM, key rotation)
+    tenancy.py               # MultiTenancyManager (namespace isolation)
+
+  agents/                    # Agent swarm optimization
+    __init__.py
+    cache.py                 # AgentContextualCache (inter-agent result reuse)
+    compressor.py            # InterAgentMessageCompressor (80-90% reduction)
+    state.py                 # AgentStateManagement (redundancy detection)
+    router.py                # AgentSpecializationRouter (per-agent-type model selection)
+    cost.py                  # AgentCostAttributor (per-agent billing)
+    orchestrator.py          # AgentSwarmOrchestrator (DAG execution, parallel tiers)
+    monitor.py               # AgentMeshMonitor (communication graph, suggestions)
+    recovery.py              # AgentFailureRecovery (cache-based fallback)
+
+  tracking/                  # Event tracking and logging
+    __init__.py
+    tracker.py               # EventTracker, InferenceEvent, JSONL persistence
+
+  api/                       # REST API layer
+    __init__.py
+    app.py                   # FastAPI application factory (lifespan, create_app)
+    routes.py                # Endpoint handlers (/infer, /metrics, /models, /health, ...)
+    middleware.py             # CORS, rate limiting, request-ID injection
+    schemas.py               # Pydantic request/response models (InferRequest, InferResponse, ...)
+
+tests/                       # Mirror src/ structure
+  conftest.py                # Shared fixtures (mock providers, sample data, configs)
+  core/
+    test_optimizer.py
+  models/
+    test_registry.py
+    test_providers.py
+  routing/
+    test_router.py
+    test_task_detector.py
+    test_constraints.py
+  cache/
+    test_exact.py
+    test_semantic.py
+    test_intermediate.py
+    test_workflow.py
+  embeddings/
+    test_engine.py
+    test_contextual.py
+    test_similarity.py
+    test_mismatch.py
+    test_threshold.py
+    test_vector_store.py
+  batching/
+    test_engine.py
+    test_queue.py
+    test_scheduler.py
+  optimization/
+    test_analyzer.py
+    test_compressor.py
+    test_few_shot.py
+    test_optimizer.py
+  features/
+    test_client.py
+    test_enricher.py
+    test_monitor.py
+  observability/
+    test_metrics.py
+    test_analytics.py
+    test_forecasting.py
+    test_anomaly.py
+    test_recommendations.py
+  governance/
+    test_auth.py
+    test_rbac.py
+    test_audit.py
+    test_compliance.py
+    test_encryption.py
+    test_tenancy.py
+  agents/
+    test_cache.py
+    test_compressor.py
+    test_state.py
+    test_router.py
+    test_cost.py
+    test_orchestrator.py
+    test_monitor.py
+    test_recovery.py
+  api/
+    test_app.py
+    test_routes.py
+
+config/
+  config.yaml                # Application settings (cache, routing, batching, etc.)
+  models.yaml                # LLM model profiles (pricing, latency, quality)
+
+docs/
+  phase1_requirements.md     # Detailed component specs per phase
+  phase2_requirements.md
+  phase3_requirements.md
+  phase4_requirements.md
+  phase5_requirements.md
+  phase6_requirements.md
+  phase7_requirements.md
+  phase8_requirements.md
+  api_and_config_spec.md     # Full API + config reference
+  data_models_and_schemas.md # All Pydantic models and DB schemas
+  implementation_roadmap.md  # Timeline, quality gates, team sizing
+  QUALITY_STANDARDS.md       # Mandatory code standards
+  PHASE2_IMPLEMENTATION.md   # Phase 2 implementation checklist
+```
+
+### Domain-to-phase mapping (which docs to read for each folder)
+
+| Source folder | Phase spec(s) |
+|---------------|---------------|
+| `src/core/` | `phase1_requirements.md` sec 6 |
+| `src/models/` | `phase1_requirements.md` sec 2 |
+| `src/routing/` | `phase1_requirements.md` sec 3, `phase2_requirements.md` sec 10-12 |
+| `src/cache/` | `phase1_requirements.md` sec 4, `phase2_requirements.md` sec 7-9 |
+| `src/embeddings/` | `phase2_requirements.md` sec 2-6, 13 |
+| `src/batching/` | `phase3_requirements.md` |
+| `src/optimization/` | `phase4_requirements.md` |
+| `src/features/` | `phase5_requirements.md` |
+| `src/observability/` | `phase6_requirements.md` |
+| `src/governance/` | `phase7_requirements.md` |
+| `src/agents/` | `phase8_requirements.md` |
+| `src/tracking/` | `phase1_requirements.md` sec 5 |
+| `src/api/` | `phase1_requirements.md` sec 7, `api_and_config_spec.md` |
+
+## Before Writing Any Code
+
+1. **Identify the domain folder** where the component belongs (e.g., `src/embeddings/`, `src/cache/`).
+
+2. **Read the phase spec.** Use the domain-to-phase mapping table above to find the right `docs/phaseN_requirements.md` file. It contains the exact public interface, method signatures, algorithm pseudocode, error handling rules, and testing requirements.
+
+3. **Read the data models.** Check `docs/data_models_and_schemas.md` for the canonical Pydantic models. Never invent your own schema if one is already defined.
+
+4. **Read the API spec.** If the component touches an endpoint, check `docs/api_and_config_spec.md` for the request/response contract.
+
+5. **Check existing code.** Before creating a new file, verify no existing module already covers the concern. Imports between domain folders are fine -- that is how the system is wired together.
+
+## Mandatory Code Standards
+
+Every file you produce MUST follow ALL of these. No exceptions.
+
+### 1. Type Hints (every function, every parameter, every return)
+
+```python
+# CORRECT
+def embed_text(self, text: str) -> np.ndarray:
+    ...
+
+# WRONG -- will be rejected
+def embed_text(self, text):
+    ...
+```
+
+### 2. Docstrings (Google-style, every public class and function)
+
+```python
+def calculate_similarity(self, vec1: np.ndarray, vec2: np.ndarray) -> float:
+    """Calculate cosine similarity between two embedding vectors.
+
+    Args:
+        vec1: First normalized embedding vector.
+        vec2: Second normalized embedding vector.
+
+    Returns:
+        Similarity score in range [0.0, 1.0] for normalized vectors.
+
+    Raises:
+        ValueError: If vectors have different dimensions.
+    """
+```
+
+### 3. Error Handling (all external calls, never bare except)
+
+```python
+# CORRECT
+try:
+    response = self._client.embed(texts=texts)
+    return response.embeddings
+except ConnectionError as e:
+    logger.error(f"Embedding API connection failed: {e}", exc_info=True)
+    raise EmbeddingError(f"Connection to {self._config.provider} failed") from e
+except TimeoutError as e:
+    logger.warning(f"Embedding API timeout, retrying: {e}")
+    raise
+
+# WRONG -- never do this
+try:
+    response = self._client.embed(texts=texts)
+except:
+    pass
+```
+
+### 4. Configuration (zero hardcoded values)
+
+```python
+# CORRECT
+class SemanticCacheConfig(BaseModel):
+    similarity_threshold: float = 0.85
+    top_k: int = 5
+
+# WRONG
+if similarity >= 0.85:  # hardcoded!
+```
+
+### 5. Dependency Injection (no global singletons)
+
+```python
+# CORRECT
+class SemanticCache:
+    def __init__(
+        self,
+        embedding_engine: EmbeddingEngine,
+        vector_db: VectorDatabase,
+        config: SemanticCacheConfig
+    ) -> None:
+        self._embedder = embedding_engine
+        self._db = vector_db
+        self._config = config
+
+# WRONG
+_global_cache = SemanticCache()  # global singleton
+```
+
+### 6. Structured Logging (JSON, with request_id context)
+
+```python
+import logging
+logger = logging.getLogger(__name__)
+
+logger.info("Cache lookup", extra={"request_id": request_id, "tier": 2, "hit": True})
+logger.error("Provider failed", extra={"model": model_name, "error": str(e)}, exc_info=True)
+```
+
+### 7. Single Responsibility
+
+- No file exceeds 600 lines.
+- Each module owns one concern.
+- If a class has more than 5 public methods, consider splitting.
+
+### 8. Naming Conventions
+
+- Classes: `PascalCase` (e.g., `SemanticCache`, `EmbeddingEngine`)
+- Functions/methods: `snake_case` (e.g., `embed_text`, `calculate_similarity`)
+- Constants: `UPPER_SNAKE_CASE` (e.g., `DEFAULT_THRESHOLD`)
+- Private: prefix with `_` (e.g., `_store`, `_compute_score`)
+- Config classes: suffix with `Config` (e.g., `EmbeddingConfig`)
+- Result classes: suffix with `Result` or describe the data (e.g., `SemanticCacheResult`, `RoutingDecision`)
+
+## Testing Standards
+
+Test files mirror the `src/` structure: for `src/embeddings/engine.py` create `tests/embeddings/test_engine.py`.
+
+```python
+import pytest
+from src.embeddings.engine import EmbeddingEngine, EmbeddingConfig
+
+class TestEmbeddingEngine:
+    """Tests for EmbeddingEngine."""
+
+    @pytest.fixture
+    def config(self) -> EmbeddingConfig:
+        return EmbeddingConfig(provider="cohere", model_name="embed-english-v3.0")
+
+    @pytest.fixture
+    def engine(self, config: EmbeddingConfig) -> EmbeddingEngine:
+        return EmbeddingEngine(config)
+
+    def test_embed_text_returns_correct_dimension(self, engine: EmbeddingEngine) -> None:
+        result = engine.embed_text("Hello world")
+        assert result.shape == (1024,)
+
+    def test_embed_text_rejects_empty_string(self, engine: EmbeddingEngine) -> None:
+        with pytest.raises(ValueError, match="must not be empty"):
+            engine.embed_text("")
+```
+
+Rules:
+- Use `pytest` with fixtures (not unittest).
+- Type hints on test functions and fixtures.
+- Descriptive test names: `test_{method}_{scenario}`.
+- Mock external APIs; never call real APIs in unit tests.
+- Minimum test counts are in each phase spec -- meet or exceed them.
+- Run by domain: `pytest tests/embeddings/ -v --cov=src/embeddings --cov-fail-under=90`
+- Run all: `pytest tests/ -v --cov=src --cov-fail-under=90`
+
+## Exception Hierarchy
+
+Use the project exception hierarchy from `data_models_and_schemas.md`:
+
+```python
+class AsahiException(Exception): ...
+class ModelNotFoundError(AsahiException): ...
+class NoModelsAvailableError(AsahiException): ...
+class ProviderError(AsahiException): ...
+class EmbeddingError(AsahiException): ...
+class VectorDBError(AsahiException): ...
+class ConfigurationError(AsahiException): ...
+```
+
+Define these in `src/exceptions.py` and import from there.
+
+## Component Implementation Checklist
+
+When asked to implement a component, follow this order:
+
+1. Identify the domain folder (`src/cache/`, `src/embeddings/`, etc.)
+2. Look up the phase spec using the domain-to-phase mapping table
+3. Read the spec section for that specific component
+4. Create the file in the domain folder (e.g., `src/cache/semantic.py`)
+5. Add `__init__.py` to the domain folder if it does not exist yet
+6. Define config model (Pydantic BaseModel) with all fields from spec
+7. Define result/output models
+8. Implement the class with all methods from the spec
+9. Add type hints, docstrings, and error handling per the spec
+10. Add structured logging
+11. Create the mirror test file (e.g., `tests/cache/test_semantic.py`)
+12. Run: `black`, `flake8 --max-line-length=100`, `mypy --strict`, `pytest --cov`
+13. Verify all acceptance criteria from the phase spec
+
+## Key Project Numbers
+
+| Metric | Phase 1 | Phase 2 | All Phases |
+|--------|---------|---------|-----------|
+| Cost savings | 58% | 85-92% | 95-97% |
+| Cache hit rate | 25-35% | 75-90% | 90%+ |
+| Quality floor | 4.0/5.0 | 4.0/5.0 | 4.0/5.0 |
+
+## Caching Tiers
+
+- Tier 1: Exact match via `md5(user_query)`. Cost: $0. Latency: <1ms.
+- Tier 2: Semantic similarity via embeddings + vector DB. Cost: ~$0.0001. Latency: 10-50ms.
+- Tier 3: Intermediate result reuse via workflow decomposition. Cost: ~$0. Latency: 5-20ms.
+
+## Routing Modes
+
+- AUTOPILOT: auto-detect task type, apply default constraints, select cheapest model that meets them.
+- GUIDED: user provides quality/latency preferences, merged with task-type constraints.
+- EXPLICIT: user selects model, Asahi suggests cheaper alternatives.
+
+## Red Flags (code to REJECT)
+
+- No type hints on any function
+- No docstrings on public classes/functions
+- No error handling on external calls
+- Hardcoded values (thresholds, model names, URLs, API keys)
+- No tests for the component
+- No logging on important operations
+- Generic variable names (x, y, data, result, temp)
+- Functions longer than 50 lines without decomposition
+- Global mutable state or singletons
+- Bare `except` clauses

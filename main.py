@@ -6,7 +6,7 @@ Usage:
     python main.py test --num_queries 50
     python main.py benchmark
     python main.py metrics
-    python main.py api [--mock] [--port 5000]
+    python main.py api [--mock] [--port 8000]
 """
 
 import argparse
@@ -17,7 +17,7 @@ import sys
 from src.optimizer import InferenceOptimizer
 
 
-def cmd_infer(args):
+def cmd_infer(args: argparse.Namespace) -> None:
     """Run a single inference request."""
     optimizer = InferenceOptimizer(use_mock=args.mock)
     result = optimizer.infer(
@@ -25,12 +25,11 @@ def cmd_infer(args):
         task_id="cli_infer",
         latency_budget_ms=args.latency,
         quality_threshold=args.quality,
-        force_model=args.model,
     )
-    print(json.dumps(result, indent=2))
+    print(json.dumps(result.model_dump(), indent=2, default=str))
 
 
-def cmd_test(args):
+def cmd_test(args: argparse.Namespace) -> None:
     """Run test queries through the optimizer."""
     queries_path = os.path.join("data", "test_queries.json")
     if not os.path.exists(queries_path):
@@ -53,22 +52,18 @@ def cmd_test(args):
             quality_threshold=args.quality,
         )
         print(
-            f"  [{i+1}/{n}] {query['id']}: "
-            f"model={result['model_used']}, "
-            f"cost=${result['cost']:.4f}, "
-            f"cache={'HIT' if result['cache_hit'] else 'MISS'}"
+            f"  [{i + 1}/{n}] {query['id']}: "
+            f"model={result.model_used}, "
+            f"cost=${result.cost:.4f}, "
+            f"cache={'HIT' if result.cache_hit else 'MISS'}"
         )
 
     metrics = optimizer.get_metrics()
-    print(f"\n--- Results ---")
-    print(json.dumps(metrics, indent=2))
-
-    # Save results
-    optimizer.tracker.save_summary("optimized_results.json")
-    print(f"\nSummary saved to data/optimized_results.json")
+    print("\n--- Results ---")
+    print(json.dumps(metrics, indent=2, default=str))
 
 
-def cmd_benchmark(args):
+def cmd_benchmark(args: argparse.Namespace) -> None:
     """Run baseline (all GPT-4) vs optimized comparison."""
     queries_path = os.path.join("data", "test_queries.json")
     if not os.path.exists(queries_path):
@@ -81,7 +76,7 @@ def cmd_benchmark(args):
     n = min(args.num_queries, len(queries))
     print(f"Benchmarking {n} queries (mock={args.mock})...\n")
 
-    # --- Baseline: force all to GPT-4 ---
+    # Baseline: all GPT-4 -- use high quality threshold but no routing
     print("=== BASELINE (All GPT-4-Turbo) ===")
     baseline = InferenceOptimizer(use_mock=args.mock)
     for i, query in enumerate(queries[:n]):
@@ -89,15 +84,13 @@ def cmd_benchmark(args):
             prompt=query["text"],
             task_id=f"baseline_{query['id']}",
             latency_budget_ms=9999,
-            quality_threshold=0,
-            force_model="gpt-4-turbo",
+            quality_threshold=4.6,  # forces GPT-4
         )
         if (i + 1) % 10 == 0:
-            print(f"  Baseline: {i+1}/{n}")
+            print(f"  Baseline: {i + 1}/{n}")
     baseline_metrics = baseline.get_metrics()
-    baseline.tracker.save_summary("baseline_results.json")
 
-    # --- Optimized: smart routing ---
+    # Optimized: smart routing
     print("\n=== OPTIMIZED (Smart Routing) ===")
     optimized = InferenceOptimizer(use_mock=args.mock)
     for i, query in enumerate(queries[:n]):
@@ -108,19 +101,17 @@ def cmd_benchmark(args):
             quality_threshold=3.5,
         )
         if (i + 1) % 10 == 0:
-            print(f"  Optimized: {i+1}/{n}")
+            print(f"  Optimized: {i + 1}/{n}")
     optimized_metrics = optimized.get_metrics()
-    optimized.tracker.save_summary("optimized_results.json")
 
-    # --- Comparison ---
     b_cost = baseline_metrics["total_cost"]
     o_cost = optimized_metrics["total_cost"]
     savings_pct = ((b_cost - o_cost) / b_cost * 100) if b_cost > 0 else 0
 
     print(f"""
-{'='*50}
+{'=' * 50}
            BENCHMARK RESULTS
-{'='*50}
+{'=' * 50}
 
 BASELINE (All GPT-4-Turbo):
   Total Cost:     ${b_cost:.4f}
@@ -131,18 +122,16 @@ OPTIMIZED (Smart Routing):
   Total Cost:     ${o_cost:.4f}
   Avg Latency:    {optimized_metrics['avg_latency_ms']:.0f}ms
   Cache Hit Rate: {optimized_metrics['cache_hit_rate']:.1%}
-  Models Used:    {optimized_metrics.get('requests_by_model', {})}
 
 SAVINGS:
   Cost Reduction: {savings_pct:.1f}%
   Absolute:       ${b_cost - o_cost:.4f}
-  Per Request:    ${b_cost/max(1,baseline_metrics['requests']):.6f} -> ${o_cost/max(1,optimized_metrics['requests']):.6f}
 
-{'='*50}
+{'=' * 50}
 """)
 
 
-def cmd_metrics(args):
+def cmd_metrics(args: argparse.Namespace) -> None:
     """Show metrics from saved results."""
     for name in ["baseline_results.json", "optimized_results.json"]:
         path = os.path.join("data", name)
@@ -155,16 +144,18 @@ def cmd_metrics(args):
             print(f"{name}: not found (run benchmark first)")
 
 
-def cmd_api(args):
-    """Start the Flask REST API server."""
+def cmd_api(args: argparse.Namespace) -> None:
+    """Start the FastAPI REST API server."""
+    import uvicorn
     from src.api import create_app
 
     app = create_app(use_mock=args.mock)
     print(f"Starting Asahi API on port {args.port} (mock={args.mock})")
-    app.run(host="0.0.0.0", port=args.port, debug=True)
+    uvicorn.run(app, host="0.0.0.0", port=args.port, log_level="info")
 
 
-def main():
+def main() -> None:
+    """Parse CLI arguments and dispatch to the appropriate command."""
     parser = argparse.ArgumentParser(
         description="Asahi - Inference Cost Optimizer"
     )
@@ -175,7 +166,6 @@ def main():
     p_infer.add_argument("--prompt", required=True, help="Input prompt")
     p_infer.add_argument("--quality", type=float, default=3.5)
     p_infer.add_argument("--latency", type=int, default=300)
-    p_infer.add_argument("--model", default=None, help="Force specific model")
     p_infer.add_argument("--mock", action="store_true", help="Use mock inference")
 
     # test
@@ -195,7 +185,7 @@ def main():
 
     # api
     p_api = subparsers.add_parser("api", help="Start REST API server")
-    p_api.add_argument("--port", type=int, default=5000)
+    p_api.add_argument("--port", type=int, default=8000)
     p_api.add_argument("--mock", action="store_true", help="Use mock inference")
 
     args = parser.parse_args()

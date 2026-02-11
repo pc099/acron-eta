@@ -6,220 +6,512 @@ and event logging to minimize inference costs while meeting quality
 and latency constraints.
 """
 
+import logging
 import os
-import time
 import random
-from datetime import datetime, timezone
+import time
+import uuid
+from typing import Optional, Tuple
 
 from dotenv import load_dotenv
+from pydantic import BaseModel, Field
 
-from src.models import MODELS, estimate_tokens, calculate_cost, get_model_profile
-from src.routing import Router
-from src.cache import InferenceCache
-from src.tracking import InferenceTracker
+from src.cache import Cache, CacheEntry
+from src.exceptions import ModelNotFoundError, ProviderError
+from src.models import (
+    ModelProfile,
+    ModelRegistry,
+    calculate_cost,
+    estimate_tokens,
+)
+from src.routing import Router, RoutingConstraints, RoutingDecision
+from src.tracking import EventTracker, InferenceEvent
 
 load_dotenv()
 
+logger = logging.getLogger(__name__)
+
+
+class InferenceResult(BaseModel):
+    """Structured result of an inference request.
+
+    Attributes:
+        response: The LLM response text.
+        model_used: Selected model name.
+        tokens_input: Actual input token count.
+        tokens_output: Actual output token count.
+        cost: Dollar cost for this request.
+        latency_ms: End-to-end latency in milliseconds.
+        cache_hit: Whether the result came from cache.
+        routing_reason: Explanation of model choice.
+        request_id: UUID for tracing.
+    """
+
+    response: str = ""
+    model_used: str = ""
+    tokens_input: int = 0
+    tokens_output: int = 0
+    cost: float = 0.0
+    latency_ms: float = 0.0
+    cache_hit: bool = False
+    routing_reason: str = ""
+    request_id: str = Field(default_factory=lambda: uuid.uuid4().hex[:12])
+
 
 class InferenceOptimizer:
+    """Central orchestrator for the Asahi inference pipeline.
+
+    Owns the complete request lifecycle: cache check, routing,
+    inference execution, cost calculation, event logging, and
+    response assembly.
+
+    Args:
+        registry: Model registry (injected).
+        router: Routing engine (injected).
+        cache: Exact-match cache (injected).
+        tracker: Event tracker (injected).
+        use_mock: If ``True``, simulate API calls instead of calling
+            real providers.
+    """
+
     def __init__(
         self,
-        enable_kafka: bool = False,
-        cache_ttl: int = 3600,
+        registry: Optional[ModelRegistry] = None,
+        router: Optional[Router] = None,
+        cache: Optional[Cache] = None,
+        tracker: Optional[EventTracker] = None,
         use_mock: bool = False,
-    ):
-        self.cache = InferenceCache(ttl_seconds=cache_ttl)
-        self.tracker = InferenceTracker(enable_kafka=enable_kafka)
-        self.router = Router()
-        self.use_mock = use_mock
+    ) -> None:
+        self._registry = registry or ModelRegistry()
+        self._router = router or Router(self._registry)
+        self._cache = cache or Cache()
+        self._tracker = tracker or EventTracker()
+        self._use_mock = use_mock
         self._start_time = time.time()
+
+    # ------------------------------------------------------------------
+    # Public API
+    # ------------------------------------------------------------------
 
     def infer(
         self,
         prompt: str,
-        task_id: str = "",
+        task_id: Optional[str] = None,
         latency_budget_ms: int = 300,
         quality_threshold: float = 3.5,
-        cost_budget: float | None = None,
-        force_model: str | None = None,
-    ) -> dict:
-        """
-        Main inference method.
+        cost_budget: Optional[float] = None,
+        user_id: Optional[str] = None,
+    ) -> InferenceResult:
+        """Run a full inference request through the optimization pipeline.
+
+        Steps:
+        1. Generate request_id
+        2. Check cache
+        3. Route to best model
+        4. Execute inference
+        5. Calculate cost
+        6. Cache the result
+        7. Log the event
+        8. Return structured result
 
         Args:
-            prompt: The input prompt to send.
-            task_id: Optional identifier for this request.
+            prompt: The user query.
+            task_id: Optional task identifier for tracking.
             latency_budget_ms: Maximum acceptable latency.
-            quality_threshold: Minimum quality score (out of 5).
-            cost_budget: Optional max cost for this request.
-            force_model: If set, bypass routing and use this model.
+            quality_threshold: Minimum quality score (0.0-5.0).
+            cost_budget: Optional maximum dollar cost for this request.
+            user_id: Optional caller identity.
 
         Returns:
-            Dict with response, model_used, cost, latency_ms, cache_hit, etc.
+            InferenceResult with response, cost, and metadata.
         """
-        timestamp = datetime.now(timezone.utc).isoformat()
+        request_id = uuid.uuid4().hex[:12]
 
         if not prompt or not prompt.strip():
-            return self._error_result(task_id, "Empty prompt", timestamp)
-
-        # 1. Check cache
-        cached = self.cache.get(prompt)
-        if cached is not None:
-            result = {
-                **cached,
-                "task_id": task_id,
-                "cache_hit": True,
-                "timestamp": timestamp,
-            }
-            self.tracker.log_inference(result)
-            return result
-
-        # 2. Select model
-        if force_model and force_model in MODELS:
-            model_name = force_model
-            routing_reason = f"Forced model: {force_model}"
-        else:
-            model_name, routing_reason = self.router.select_model(
-                prompt=prompt,
-                latency_budget_ms=latency_budget_ms,
-                quality_threshold=quality_threshold,
-                cost_budget=cost_budget,
+            logger.warning(
+                "Empty prompt received",
+                extra={"request_id": request_id},
+            )
+            return InferenceResult(
+                request_id=request_id,
+                routing_reason="Error: empty prompt",
             )
 
-        # 3. Execute inference
+        # 1. CACHE CHECK
+        cache_entry = self._check_cache(prompt)
+        if cache_entry is not None:
+            result = InferenceResult(
+                response=cache_entry.response,
+                model_used=cache_entry.model,
+                tokens_input=0,
+                tokens_output=0,
+                cost=0.0,
+                latency_ms=0.0,
+                cache_hit=True,
+                routing_reason="Cache hit (exact match)",
+                request_id=request_id,
+            )
+            self._log_event(
+                request_id=request_id,
+                event_model=cache_entry.model,
+                cache_hit=True,
+                input_tokens=0,
+                output_tokens=0,
+                latency_ms=0,
+                cost=0.0,
+                routing_reason="Cache hit",
+                task_type=task_id,
+                user_id=user_id,
+            )
+            return result
+
+        # 2. ROUTE
+        constraints = RoutingConstraints(
+            quality_threshold=quality_threshold,
+            latency_budget_ms=latency_budget_ms,
+            cost_budget=cost_budget,
+        )
+        decision = self._route(constraints)
+
+        # 3. EXECUTE INFERENCE
         start = time.time()
-        response_text, output_tokens = self._call_model(model_name, prompt)
-        latency_ms = (time.time() - start) * 1000
+        try:
+            response_text, actual_input, actual_output, provider_latency = (
+                self._execute_inference(decision.model_name, prompt)
+            )
+        except ProviderError:
+            # Attempt fallback to highest-quality model
+            logger.warning(
+                "Primary model failed, attempting fallback",
+                extra={
+                    "request_id": request_id,
+                    "failed_model": decision.model_name,
+                },
+            )
+            fallback_model = max(
+                self._registry.all(), key=lambda m: m.quality_score
+            )
+            if fallback_model.name == decision.model_name:
+                raise
+            response_text, actual_input, actual_output, provider_latency = (
+                self._execute_inference(fallback_model.name, prompt)
+            )
+            decision = RoutingDecision(
+                model_name=fallback_model.name,
+                reason=f"Fallback after {decision.model_name} failed",
+                fallback_used=True,
+            )
 
-        # 4. Calculate tokens and cost
-        input_tokens = estimate_tokens(prompt)
-        cost = calculate_cost(input_tokens, output_tokens, model_name)
+        total_latency_ms = (time.time() - start) * 1000
 
-        # 5. Build result
-        result = {
-            "task_id": task_id,
-            "response": response_text,
-            "model_used": model_name,
-            "tokens_input": input_tokens,
-            "tokens_output": output_tokens,
-            "tokens_total": input_tokens + output_tokens,
-            "cost": cost,
-            "latency_ms": round(latency_ms, 1),
-            "cache_hit": False,
-            "routing_reason": routing_reason,
-            "timestamp": timestamp,
-        }
+        # 4. CALCULATE COST
+        model_profile = self._registry.get(decision.model_name)
+        cost = calculate_cost(model_profile, actual_input, actual_output)
 
-        # 6. Cache result
-        self.cache.put(prompt, result)
+        # 5. CACHE RESULT
+        self._cache.set(
+            query=prompt,
+            response=response_text,
+            model=decision.model_name,
+            cost=cost,
+        )
 
-        # 7. Log event
-        self.tracker.log_inference(result)
+        # 6. LOG EVENT
+        self._log_event(
+            request_id=request_id,
+            event_model=decision.model_name,
+            cache_hit=False,
+            input_tokens=actual_input,
+            output_tokens=actual_output,
+            latency_ms=int(total_latency_ms),
+            cost=cost,
+            routing_reason=decision.reason,
+            task_type=task_id,
+            user_id=user_id,
+        )
 
-        return result
+        # 7. RETURN
+        return InferenceResult(
+            response=response_text,
+            model_used=decision.model_name,
+            tokens_input=actual_input,
+            tokens_output=actual_output,
+            cost=cost,
+            latency_ms=round(total_latency_ms, 1),
+            cache_hit=False,
+            routing_reason=decision.reason,
+            request_id=request_id,
+        )
 
-    def _call_model(self, model_name: str, prompt: str) -> tuple[str, int]:
-        """
-        Call the actual model API, or mock if use_mock is True.
+    def get_metrics(self) -> dict:
+        """Return current metrics summary including cache and uptime.
 
         Returns:
-            (response_text, output_token_count)
+            Dict with analytics from the tracker plus cache stats.
         """
-        if self.use_mock:
+        summary = self._tracker.get_metrics()
+        cache_stats = self._cache.stats()
+        summary["cache_size"] = cache_stats.entry_count
+        summary["cache_hit_rate"] = round(cache_stats.hit_rate, 4)
+        summary["cache_cost_saved"] = cache_stats.total_cost_saved
+        summary["uptime_seconds"] = round(time.time() - self._start_time, 1)
+        return summary
+
+    # ------------------------------------------------------------------
+    # Properties for external access to components
+    # ------------------------------------------------------------------
+
+    @property
+    def registry(self) -> ModelRegistry:
+        """Access the model registry."""
+        return self._registry
+
+    @property
+    def cache(self) -> Cache:
+        """Access the cache."""
+        return self._cache
+
+    @property
+    def tracker(self) -> EventTracker:
+        """Access the event tracker."""
+        return self._tracker
+
+    # ------------------------------------------------------------------
+    # Internal helpers
+    # ------------------------------------------------------------------
+
+    def _check_cache(self, prompt: str) -> Optional[CacheEntry]:
+        """Delegate cache lookup to the cache component.
+
+        Args:
+            prompt: User query to look up.
+
+        Returns:
+            CacheEntry on hit, None on miss.
+        """
+        return self._cache.get(prompt)
+
+    def _route(self, constraints: RoutingConstraints) -> RoutingDecision:
+        """Delegate model selection to the router.
+
+        Args:
+            constraints: Quality/latency/cost constraints.
+
+        Returns:
+            RoutingDecision with the selected model.
+        """
+        return self._router.select_model(constraints)
+
+    def _execute_inference(
+        self, model_name: str, prompt: str
+    ) -> Tuple[str, int, int, int]:
+        """Call the provider API or mock, with retry logic.
+
+        Args:
+            model_name: Which model to call.
+            prompt: The user query.
+
+        Returns:
+            Tuple of (response_text, input_tokens, output_tokens, latency_ms).
+
+        Raises:
+            ProviderError: After all retries are exhausted.
+        """
+        if self._use_mock:
             return self._mock_call(model_name, prompt)
 
-        profile = get_model_profile(model_name)
-        provider = profile["provider"]
+        profile = self._registry.get(model_name)
 
+        last_error: Optional[Exception] = None
         for attempt in range(3):
             try:
-                if provider == "openai":
+                if profile.provider == "openai":
                     return self._call_openai(model_name, prompt)
-                elif provider == "anthropic":
+                elif profile.provider == "anthropic":
                     return self._call_anthropic(model_name, prompt)
                 else:
-                    raise ValueError(f"Unknown provider: {provider}")
-            except Exception as e:
-                if attempt == 2:
-                    raise RuntimeError(
-                        f"Failed after 3 retries for {model_name}: {e}"
-                    ) from e
-                # Exponential backoff: 1s, 2s, 4s
-                time.sleep(2**attempt)
+                    raise ProviderError(
+                        f"Unknown provider: {profile.provider}"
+                    )
+            except ProviderError:
+                raise
+            except Exception as exc:
+                last_error = exc
+                wait = 2**attempt
+                logger.warning(
+                    "Provider call failed, retrying",
+                    extra={
+                        "model": model_name,
+                        "attempt": attempt + 1,
+                        "wait_seconds": wait,
+                        "error": str(exc),
+                    },
+                )
+                if attempt < 2:
+                    time.sleep(wait)
 
-        # Unreachable, but satisfies type checker
-        raise RuntimeError(f"Failed to call {model_name}")
+        raise ProviderError(
+            f"Failed after 3 retries for {model_name}: {last_error}"
+        )
 
-    def _call_openai(self, model_name: str, prompt: str) -> tuple[str, int]:
-        """Call OpenAI API."""
+    def _call_openai(
+        self, model_name: str, prompt: str
+    ) -> Tuple[str, int, int, int]:
+        """Call the OpenAI API.
+
+        Args:
+            model_name: OpenAI model identifier.
+            prompt: User query.
+
+        Returns:
+            Tuple of (response_text, input_tokens, output_tokens, latency_ms).
+        """
         from openai import OpenAI
 
+        start = time.time()
         client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
         response = client.chat.completions.create(
             model=model_name,
             messages=[{"role": "user", "content": prompt}],
             max_tokens=1024,
         )
+        latency_ms = int((time.time() - start) * 1000)
         text = response.choices[0].message.content or ""
-        output_tokens = response.usage.completion_tokens if response.usage else estimate_tokens(text)
-        return text, output_tokens
+        input_tokens = (
+            response.usage.prompt_tokens if response.usage else estimate_tokens(prompt)
+        )
+        output_tokens = (
+            response.usage.completion_tokens
+            if response.usage
+            else estimate_tokens(text)
+        )
+        return text, input_tokens, output_tokens, latency_ms
 
-    def _call_anthropic(self, model_name: str, prompt: str) -> tuple[str, int]:
-        """Call Anthropic API."""
+    def _call_anthropic(
+        self, model_name: str, prompt: str
+    ) -> Tuple[str, int, int, int]:
+        """Call the Anthropic API.
+
+        Args:
+            model_name: Anthropic model identifier.
+            prompt: User query.
+
+        Returns:
+            Tuple of (response_text, input_tokens, output_tokens, latency_ms).
+        """
         import anthropic
 
+        start = time.time()
         client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
         response = client.messages.create(
             model=model_name,
             max_tokens=1024,
             messages=[{"role": "user", "content": prompt}],
         )
+        latency_ms = int((time.time() - start) * 1000)
         text = response.content[0].text if response.content else ""
-        output_tokens = response.usage.output_tokens if response.usage else estimate_tokens(text)
-        return text, output_tokens
+        input_tokens = (
+            response.usage.input_tokens
+            if response.usage
+            else estimate_tokens(prompt)
+        )
+        output_tokens = (
+            response.usage.output_tokens
+            if response.usage
+            else estimate_tokens(text)
+        )
+        return text, input_tokens, output_tokens, latency_ms
 
-    def _mock_call(self, model_name: str, prompt: str) -> tuple[str, int]:
+    def _mock_call(
+        self, model_name: str, prompt: str
+    ) -> Tuple[str, int, int, int]:
+        """Simulate an API call with realistic latency and token counts.
+
+        Args:
+            model_name: Model to simulate.
+            prompt: User query.
+
+        Returns:
+            Tuple of (response_text, input_tokens, output_tokens, latency_ms).
         """
-        Simulate an API call with realistic latency and token counts.
-        Used for testing without burning API credits.
-        """
-        profile = get_model_profile(model_name)
-        # Simulate latency with some variance
-        base_latency = profile["avg_latency_ms"] / 1000
+        profile = self._registry.get(model_name)
+        # Simulate some latency (scaled down for tests)
+        base_latency = profile.avg_latency_ms / 1000
         jitter = random.uniform(0.8, 1.2)
-        time.sleep(base_latency * jitter * 0.01)  # Scale down for tests
+        time.sleep(base_latency * jitter * 0.01)
 
         input_tokens = estimate_tokens(prompt)
         output_tokens = max(20, int(input_tokens * random.uniform(0.3, 0.8)))
+        latency_ms = int(profile.avg_latency_ms * jitter)
 
         response_text = (
             f"[Mock response from {model_name}] "
             f"Processed prompt with {input_tokens} input tokens. "
             f"This is a simulated response for testing purposes."
         )
-        return response_text, output_tokens
+        return response_text, input_tokens, output_tokens, latency_ms
 
-    def _error_result(self, task_id: str, error: str, timestamp: str) -> dict:
-        """Build an error result dict."""
-        return {
-            "task_id": task_id,
-            "response": None,
-            "model_used": None,
-            "tokens_input": 0,
-            "tokens_output": 0,
-            "tokens_total": 0,
-            "cost": 0.0,
-            "latency_ms": 0.0,
-            "cache_hit": False,
-            "routing_reason": f"Error: {error}",
-            "timestamp": timestamp,
-            "error": error,
-        }
+    def _log_event(
+        self,
+        request_id: str,
+        event_model: str,
+        cache_hit: bool,
+        input_tokens: int,
+        output_tokens: int,
+        latency_ms: int,
+        cost: float,
+        routing_reason: str,
+        task_type: Optional[str] = None,
+        user_id: Optional[str] = None,
+    ) -> None:
+        """Create and log an InferenceEvent.
 
-    def get_metrics(self) -> dict:
-        """Return current metrics summary."""
-        summary = self.tracker.summarize()
-        summary["cache_size"] = self.cache.size
-        summary["cache_hit_rate"] = round(self.cache.hit_rate, 4)
-        summary["uptime_seconds"] = round(time.time() - self._start_time, 1)
-        return summary
+        Args:
+            request_id: Unique request identifier.
+            event_model: Model that handled the request.
+            cache_hit: Whether cache was used.
+            input_tokens: Token count in.
+            output_tokens: Token count out.
+            latency_ms: End-to-end latency.
+            cost: Dollar cost.
+            routing_reason: Reason for model selection.
+            task_type: Optional task category.
+            user_id: Optional caller identity.
+        """
+        event = InferenceEvent(
+            request_id=request_id,
+            model_selected=event_model,
+            cache_hit=cache_hit,
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            total_tokens=input_tokens + output_tokens,
+            latency_ms=latency_ms,
+            cost=cost,
+            routing_reason=routing_reason,
+            task_type=task_type,
+            user_id=user_id,
+        )
+        self._tracker.log_event(event)
+
+    def _calculate_cost(
+        self, model_name: str, input_tokens: int, output_tokens: int
+    ) -> float:
+        """Calculate cost using the registry.
+
+        Args:
+            model_name: Model to look up pricing for.
+            input_tokens: Number of input tokens.
+            output_tokens: Number of output tokens.
+
+        Returns:
+            Dollar cost.
+        """
+        try:
+            profile = self._registry.get(model_name)
+            return calculate_cost(profile, input_tokens, output_tokens)
+        except ModelNotFoundError:
+            logger.error(
+                "Model not in registry for cost calculation",
+                extra={"model": model_name},
+            )
+            return 0.0

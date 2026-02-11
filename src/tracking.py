@@ -1,99 +1,157 @@
 """
-Event logging and analytics for Asahi inference optimizer.
+Event tracking and analytics for Asahi inference optimizer.
 
-Tracks all inference events and provides cost/latency/quality analytics.
+Logs every inference event with full metadata for cost accounting,
+quality measurement, and operational observability.  Persists to
+local JSONL files (MVP) with a pluggable backend interface.
 """
 
+import csv
 import json
+import logging
 import os
 from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+
+from pydantic import BaseModel, Field
+
+logger = logging.getLogger(__name__)
 
 
-class InferenceTracker:
-    def __init__(self, enable_kafka: bool = False, log_dir: str = "data"):
-        self.enable_kafka = enable_kafka
-        self.local_logs: list[dict] = []
-        self.log_dir = log_dir
-        self.kafka_producer = None
+class InferenceEvent(BaseModel):
+    """A single inference event with full metadata.
 
-        if enable_kafka:
-            self._init_kafka()
+    Attributes:
+        request_id: UUID-based unique identifier.
+        timestamp: UTC time of the event.
+        user_id: Caller identity (if available).
+        task_type: Task category, e.g. ``summarization``, ``faq``.
+        model_selected: Model that handled the request.
+        cache_hit: Whether the result came from cache.
+        input_tokens: Actual input token count.
+        output_tokens: Actual output token count.
+        total_tokens: Sum of input and output tokens.
+        latency_ms: End-to-end latency in milliseconds.
+        cost: Computed dollar cost.
+        routing_reason: Why this model was chosen.
+        quality_score: Predicted or measured quality.
+    """
 
-    def _init_kafka(self):
-        """Initialize Kafka producer if available."""
+    request_id: str
+    timestamp: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc)
+    )
+    user_id: Optional[str] = None
+    task_type: Optional[str] = None
+    model_selected: str = ""
+    cache_hit: bool = False
+    input_tokens: int = 0
+    output_tokens: int = 0
+    total_tokens: int = 0
+    latency_ms: int = 0
+    cost: float = 0.0
+    routing_reason: str = ""
+    quality_score: Optional[float] = None
+
+
+class EventTracker:
+    """Tracks inference events and computes analytics.
+
+    Persists events to daily JSONL files and keeps an in-memory copy
+    for fast metric aggregation.
+
+    Args:
+        log_dir: Directory for JSONL log files.  Created if it does
+            not exist.
+    """
+
+    def __init__(self, log_dir: Path = Path("data/logs")) -> None:
+        self._log_dir = log_dir
+        self._events: List[InferenceEvent] = []
+
         try:
-            from kafka import KafkaProducer
-
-            servers = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "localhost:9092")
-            self.kafka_producer = KafkaProducer(
-                bootstrap_servers=servers,
-                value_serializer=lambda v: json.dumps(v).encode("utf-8"),
+            self._log_dir.mkdir(parents=True, exist_ok=True)
+        except OSError as exc:
+            logger.error(
+                "Could not create log directory",
+                extra={"path": str(self._log_dir), "error": str(exc)},
             )
-        except Exception:
-            self.kafka_producer = None
-            self.enable_kafka = False
 
-    def log_inference(self, event: dict) -> None:
-        """Log an inference event to local storage and optionally Kafka."""
-        event["logged_at"] = datetime.now(timezone.utc).isoformat()
-        self.local_logs.append(event)
+    def log_event(self, event: InferenceEvent) -> None:
+        """Append an event to memory and persist to the daily JSONL file.
 
-        if self.enable_kafka and self.kafka_producer:
-            try:
-                self.kafka_producer.send("asahi_inference_events", value=event)
-            except Exception:
-                pass  # Don't fail on Kafka errors
+        Args:
+            event: The inference event to record.
+        """
+        self._events.append(event)
 
-    def summarize(self) -> dict:
-        """Return comprehensive analytics across all logged events."""
-        if not self.local_logs:
+        # Persist to daily JSONL
+        date_str = event.timestamp.strftime("%Y-%m-%d")
+        filename = f"events_{date_str}.jsonl"
+        filepath = self._log_dir / filename
+
+        try:
+            with open(filepath, "a", encoding="utf-8") as fh:
+                fh.write(event.model_dump_json() + "\n")
+        except OSError as exc:
+            logger.error(
+                "Failed to write event to log file",
+                extra={"path": str(filepath), "error": str(exc)},
+            )
+
+        logger.debug(
+            "Event logged",
+            extra={
+                "request_id": event.request_id,
+                "model": event.model_selected,
+                "cache_hit": event.cache_hit,
+            },
+        )
+
+    def get_metrics(self) -> Dict[str, Any]:
+        """Compute aggregate analytics across all tracked events.
+
+        Returns:
+            Dict containing: ``total_cost``, ``requests``, ``avg_latency_ms``,
+            ``cache_hit_rate``, ``cost_by_model``, ``savings_vs_baseline``,
+            and more.
+        """
+        if not self._events:
             return {
                 "total_cost": 0.0,
+                "gpt4_equivalent_cost": 0.0,
                 "requests": 0,
                 "avg_latency_ms": 0.0,
                 "cache_hit_rate": 0.0,
                 "cost_by_model": {},
                 "requests_by_model": {},
-                "cost_per_request_by_model": {},
-                "top_models_by_usage": [],
                 "estimated_savings_vs_gpt4": 0.0,
+                "absolute_savings": 0.0,
             }
 
-        total_cost = sum(e.get("cost", 0) for e in self.local_logs)
-        requests = len(self.local_logs)
-        avg_latency = (
-            sum(e.get("latency_ms", 0) for e in self.local_logs) / requests
-        )
-        cache_hits = sum(1 for e in self.local_logs if e.get("cache_hit", False))
+        total_cost = sum(e.cost for e in self._events)
+        requests = len(self._events)
+        avg_latency = sum(e.latency_ms for e in self._events) / requests
+        cache_hits = sum(1 for e in self._events if e.cache_hit)
         cache_hit_rate = cache_hits / requests
 
-        # Cost by model
-        cost_by_model: dict[str, float] = {}
-        requests_by_model: dict[str, int] = {}
-        for e in self.local_logs:
-            model = e.get("model_used", "unknown")
-            cost_by_model[model] = cost_by_model.get(model, 0) + e.get("cost", 0)
+        # Aggregate by model
+        cost_by_model: Dict[str, float] = {}
+        requests_by_model: Dict[str, int] = {}
+        for event in self._events:
+            model = event.model_selected or "unknown"
+            cost_by_model[model] = cost_by_model.get(model, 0.0) + event.cost
             requests_by_model[model] = requests_by_model.get(model, 0) + 1
 
-        cost_per_request_by_model = {
-            model: cost_by_model[model] / requests_by_model[model]
-            for model in cost_by_model
-        }
-
-        # Top models by usage
-        top_models = sorted(
-            requests_by_model.items(), key=lambda x: x[1], reverse=True
+        # Baseline comparison: what would GPT-4 Turbo have cost?
+        gpt4_input_rate = 0.010  # per 1k tokens
+        gpt4_output_rate = 0.030  # per 1k tokens
+        gpt4_total = sum(
+            (e.input_tokens * gpt4_input_rate + e.output_tokens * gpt4_output_rate)
+            / 1000
+            for e in self._events
         )
-
-        # Estimate savings vs all-GPT-4: recalculate what GPT-4 would have cost
-        from src.models import calculate_cost
-
-        gpt4_total = 0.0
-        for e in self.local_logs:
-            input_tokens = e.get("tokens_input", 0)
-            output_tokens = e.get("tokens_output", 0)
-            gpt4_total += calculate_cost(input_tokens, output_tokens, "gpt-4-turbo")
-
         savings = gpt4_total - total_cost if gpt4_total > 0 else 0.0
         savings_pct = (savings / gpt4_total * 100) if gpt4_total > 0 else 0.0
 
@@ -105,30 +163,103 @@ class InferenceTracker:
             "cache_hit_rate": round(cache_hit_rate, 4),
             "cost_by_model": {k: round(v, 4) for k, v in cost_by_model.items()},
             "requests_by_model": requests_by_model,
-            "cost_per_request_by_model": {
-                k: round(v, 6) for k, v in cost_per_request_by_model.items()
-            },
-            "top_models_by_usage": top_models,
             "estimated_savings_vs_gpt4": round(savings_pct, 1),
             "absolute_savings": round(savings, 4),
         }
 
-    def save_to_file(self, filename: str) -> str:
-        """Save current logs to a JSON file. Returns the file path."""
-        os.makedirs(self.log_dir, exist_ok=True)
-        filepath = os.path.join(self.log_dir, filename)
-        with open(filepath, "w") as f:
-            json.dump(self.local_logs, f, indent=2)
-        return filepath
+    def get_events(
+        self,
+        since: Optional[datetime] = None,
+        limit: int = 100,
+    ) -> List[InferenceEvent]:
+        """Query in-memory events with optional time filter.
 
-    def save_summary(self, filename: str) -> str:
-        """Save summary analytics to a JSON file. Returns the file path."""
-        os.makedirs(self.log_dir, exist_ok=True)
-        filepath = os.path.join(self.log_dir, filename)
-        with open(filepath, "w") as f:
-            json.dump(self.summarize(), f, indent=2)
-        return filepath
+        Args:
+            since: If provided, only return events after this timestamp.
+            limit: Maximum number of events to return.
+
+        Returns:
+            List of matching events, newest first, capped at ``limit``.
+        """
+        events = self._events
+        if since is not None:
+            events = [e for e in events if e.timestamp >= since]
+        # Return newest first
+        return list(reversed(events[-limit:]))
+
+    def load_from_file(self, path: Path) -> None:
+        """Re-hydrate events from an existing JSONL file.
+
+        Corrupted lines are skipped with a warning.
+
+        Args:
+            path: Path to the JSONL file.
+        """
+        if not path.exists():
+            logger.warning(
+                "Log file does not exist",
+                extra={"path": str(path)},
+            )
+            return
+
+        loaded = 0
+        with open(path, "r", encoding="utf-8") as fh:
+            for line_num, line in enumerate(fh, start=1):
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    data = json.loads(line)
+                    event = InferenceEvent(**data)
+                    self._events.append(event)
+                    loaded += 1
+                except (json.JSONDecodeError, Exception) as exc:
+                    logger.warning(
+                        "Skipping corrupted JSONL line",
+                        extra={
+                            "path": str(path),
+                            "line_number": line_num,
+                            "error": str(exc),
+                        },
+                    )
+
+        logger.info(
+            "Events loaded from file",
+            extra={"path": str(path), "count": loaded},
+        )
+
+    def export_csv(self, path: Path) -> None:
+        """Export all tracked events to a CSV file.
+
+        Args:
+            path: Output CSV file path.
+        """
+        if not self._events:
+            logger.warning("No events to export")
+            return
+
+        path.parent.mkdir(parents=True, exist_ok=True)
+        fieldnames = list(InferenceEvent.model_fields.keys())
+
+        with open(path, "w", newline="", encoding="utf-8") as fh:
+            writer = csv.DictWriter(fh, fieldnames=fieldnames)
+            writer.writeheader()
+            for event in self._events:
+                row = event.model_dump()
+                # Convert datetime to ISO string for CSV
+                row["timestamp"] = event.timestamp.isoformat()
+                writer.writerow(row)
+
+        logger.info(
+            "Events exported to CSV",
+            extra={"path": str(path), "count": len(self._events)},
+        )
 
     def reset(self) -> None:
-        """Clear all logged events."""
-        self.local_logs.clear()
+        """Clear all in-memory events."""
+        self._events.clear()
+
+    @property
+    def event_count(self) -> int:
+        """Number of events tracked in memory."""
+        return len(self._events)
