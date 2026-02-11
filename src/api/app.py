@@ -2,26 +2,35 @@
 FastAPI application factory for Asahi inference optimizer.
 
 Creates and configures the FastAPI app with all routes, middleware,
-and shared state.
+and shared state.  Includes analytics endpoints (Phase 6).
 """
 
 import logging
 import time
 import uuid
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 
 from src.api.middleware import RateLimiter
 from src.api.schemas import (
+    AnalyticsResponse,
+    CostBreakdownRequest,
     ErrorResponse,
+    ForecastRequest,
     HealthResponse,
     InferRequest,
     InferResponse,
+    TrendRequest,
 )
 from src.core.optimizer import InferenceOptimizer, InferenceResult
-from src.exceptions import NoModelsAvailableError, ProviderError
+from src.exceptions import NoModelsAvailableError, ObservabilityError, ProviderError
+from src.observability.analytics import AnalyticsEngine
+from src.observability.anomaly import AnomalyDetector
+from src.observability.forecasting import ForecastingModel
+from src.observability.metrics import MetricsCollector
+from src.observability.recommendations import RecommendationEngine
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +55,15 @@ def create_app(use_mock: bool = False) -> FastAPI:
     app.state.start_time = time.time()
     app.state.version = "1.0.0"
     app.state.rate_limiter = RateLimiter(max_requests=100, window_seconds=60)
+
+    # -- Observability (Phase 6) --
+    app.state.metrics_collector = MetricsCollector()
+    app.state.analytics_engine = AnalyticsEngine(app.state.metrics_collector)
+    app.state.forecasting_model = ForecastingModel(app.state.analytics_engine)
+    app.state.anomaly_detector = AnomalyDetector(app.state.analytics_engine)
+    app.state.recommendation_engine = RecommendationEngine(
+        app.state.analytics_engine
+    )
 
     # -- CORS --
     app.add_middleware(
@@ -193,7 +211,130 @@ def create_app(use_mock: bool = False) -> FastAPI:
                     if len(optimizer.registry) > 0
                     else "degraded"
                 ),
+                "observability": "healthy",
             },
+        )
+
+    # -- Analytics endpoints (Phase 6) --
+
+    @app.get(
+        "/analytics/cost-breakdown",
+        response_model=AnalyticsResponse,
+        summary="Cost breakdown by model/task/period",
+    )
+    async def cost_breakdown(
+        request: Request,
+        period: str = "day",
+        group_by: str = "model",
+    ) -> AnalyticsResponse:
+        """Return cost breakdown grouped by model, task type, or tier."""
+        engine: AnalyticsEngine = request.app.state.analytics_engine
+        try:
+            data = engine.cost_breakdown(period=period, group_by=group_by)  # type: ignore[arg-type]
+        except ObservabilityError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return AnalyticsResponse(data=data)
+
+    @app.get(
+        "/analytics/trends",
+        response_model=AnalyticsResponse,
+        summary="Time-series trend data",
+    )
+    async def trends(
+        request: Request,
+        metric: str = "cost",
+        period: str = "day",
+        intervals: int = 30,
+    ) -> AnalyticsResponse:
+        """Return time-series trend data for the given metric."""
+        engine: AnalyticsEngine = request.app.state.analytics_engine
+        try:
+            data = engine.trend(metric=metric, period=period, intervals=intervals)
+        except ObservabilityError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return AnalyticsResponse(data=data)
+
+    @app.get(
+        "/analytics/forecast",
+        response_model=AnalyticsResponse,
+        summary="Cost forecast",
+    )
+    async def forecast(
+        request: Request,
+        horizon_days: int = 30,
+        monthly_budget: float = 0.0,
+    ) -> AnalyticsResponse:
+        """Return cost forecast and optional budget risk assessment."""
+        model: ForecastingModel = request.app.state.forecasting_model
+        cost_forecast = model.predict_cost(horizon_days=horizon_days)
+        budget_risk = (
+            model.detect_budget_risk(monthly_budget)
+            if monthly_budget > 0
+            else None
+        )
+        return AnalyticsResponse(
+            data={
+                "forecast": cost_forecast.model_dump(),
+                "budget_risk": budget_risk,
+            }
+        )
+
+    @app.get(
+        "/analytics/anomalies",
+        response_model=AnalyticsResponse,
+        summary="Current anomalies",
+    )
+    async def anomalies(request: Request) -> AnalyticsResponse:
+        """Return any currently detected anomalies."""
+        detector: AnomalyDetector = request.app.state.anomaly_detector
+        results = detector.check()
+        return AnalyticsResponse(
+            data=[a.model_dump() for a in results]
+        )
+
+    @app.get(
+        "/analytics/recommendations",
+        response_model=AnalyticsResponse,
+        summary="Active recommendations",
+    )
+    async def recommendations(request: Request) -> AnalyticsResponse:
+        """Return actionable optimization recommendations."""
+        engine: RecommendationEngine = request.app.state.recommendation_engine
+        results = engine.generate()
+        return AnalyticsResponse(
+            data=[r.model_dump() for r in results]
+        )
+
+    @app.get(
+        "/analytics/cache-performance",
+        response_model=AnalyticsResponse,
+        summary="Cache performance per tier",
+    )
+    async def cache_performance(request: Request) -> AnalyticsResponse:
+        """Return per-tier and overall cache performance."""
+        engine: AnalyticsEngine = request.app.state.analytics_engine
+        return AnalyticsResponse(data=engine.cache_performance())
+
+    @app.get(
+        "/analytics/latency-percentiles",
+        response_model=AnalyticsResponse,
+        summary="Latency percentiles",
+    )
+    async def latency_percentiles(request: Request) -> AnalyticsResponse:
+        """Return latency percentiles (p50, p75, p90, p95, p99)."""
+        engine: AnalyticsEngine = request.app.state.analytics_engine
+        return AnalyticsResponse(data=engine.latency_percentiles())
+
+    @app.get(
+        "/analytics/prometheus",
+        summary="Prometheus metrics endpoint",
+    )
+    async def prometheus_metrics(request: Request) -> Response:
+        """Return metrics in Prometheus text exposition format."""
+        collector: MetricsCollector = request.app.state.metrics_collector
+        return Response(
+            content=collector.get_prometheus_metrics(),
+            media_type="text/plain; version=0.0.4; charset=utf-8",
         )
 
     return app

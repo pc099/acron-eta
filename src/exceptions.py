@@ -32,3 +32,19 @@ class EmbeddingError(AsahiException):
 
 class VectorDBError(AsahiException):
     """Raised when a vector database operation fails."""
+
+
+class BatchingError(AsahiException):
+    """Raised when a batching operation fails."""
+
+
+class FeatureConfigError(AsahiException, ValueError):
+    """Raised when feature store configuration or feature names are invalid."""
+
+
+class FeatureStoreError(AsahiException):
+    """Raised when a feature store operation fails."""
+
+
+class ObservabilityError(AsahiException):
+    """Raised when a metrics, analytics, or forecasting operation fails."""

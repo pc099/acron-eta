@@ -2,7 +2,7 @@
 Pydantic request/response models for the Asahi REST API.
 """
 
-from typing import Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -93,3 +93,56 @@ class ErrorResponse(BaseModel):
     error: str
     message: str
     request_id: Optional[str] = None
+
+
+# ---------------------------------------------------------------------------
+# Analytics schemas (Phase 6)
+# ---------------------------------------------------------------------------
+
+
+class CostBreakdownRequest(BaseModel):
+    """Query parameters for cost breakdown.
+
+    Attributes:
+        period: Time window (hour, day, week, month).
+        group_by: Grouping dimension.
+    """
+
+    period: str = Field(default="day", description="hour|day|week|month")
+    group_by: str = Field(default="model", description="model|task_type|user|tier")
+
+
+class TrendRequest(BaseModel):
+    """Query parameters for trend data.
+
+    Attributes:
+        metric: Metric to trend.
+        period: Time window.
+        intervals: Number of data points.
+    """
+
+    metric: str = Field(default="cost", description="cost|latency|requests|cache_hit_rate")
+    period: str = Field(default="day", description="hour|day|week|month")
+    intervals: int = Field(default=30, ge=1, le=1000)
+
+
+class ForecastRequest(BaseModel):
+    """Query parameters for cost forecast.
+
+    Attributes:
+        horizon_days: Number of days to forecast.
+        monthly_budget: Optional budget for risk detection.
+    """
+
+    horizon_days: int = Field(default=30, ge=1, le=365)
+    monthly_budget: Optional[float] = Field(default=None, ge=0.0)
+
+
+class AnalyticsResponse(BaseModel):
+    """Generic analytics response wrapper.
+
+    Attributes:
+        data: The analytics result payload.
+    """
+
+    data: Any

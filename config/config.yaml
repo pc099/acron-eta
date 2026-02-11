@@ -18,11 +18,51 @@ routing:
   default_quality_threshold: 3.5
   default_latency_budget_ms: 300
 
+feature_store:
+  provider: local
+  local_data_path: "data/features.json"
+  timeout_ms: 200
+  fallback_on_timeout: true
+  freshness_threshold_seconds: 3600
+  max_feature_tokens: 200
+
+optimization:
+  min_relevance_threshold: 0.3
+  scoring_method: "keyword"
+  max_history_turns: 5
+  extractive_top_ratio: 0.5
+  max_few_shot_examples: 3
+  max_quality_risk: "medium"
+
+batching:
+  min_batch_size: 2
+  max_batch_size: 10
+  max_wait_ms: 500
+  latency_threshold_ms: 200
+  eligible_task_types:
+    - summarization
+    - faq
+    - translation
+
 tracking:
   log_dir: "data/logs"
   enable_kafka: false
   kafka_bootstrap_servers: "localhost:9092"
   kafka_topic: "asahi_inference_events"
+
+observability:
+  enabled: true
+  prometheus_port: 9090
+  collection_interval_seconds: 10
+  retention_hours: 168            # 7 days in-memory
+  export_format: "prometheus"     # prometheus | json | both
+  anomaly:
+    cost_spike_threshold: 2.0
+    latency_spike_threshold: 2.0
+    error_rate_threshold: 0.01
+    cache_degradation_threshold: 0.5
+    quality_drop_threshold: 0.5
+    rolling_window_hours: 24
 
 logging:
   level: "INFO"
