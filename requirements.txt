@@ -30,3 +30,7 @@ mypy>=1.13.0
 
 # ── Numeric / Embeddings (needed by Phase 2+) ─────────
 numpy>=1.26.0
+
+# ── Encryption & Auth (Phase 7) ───────────────────────
+cryptography>=43.0.0
+bcrypt>=4.2.0

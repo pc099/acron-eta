@@ -48,3 +48,15 @@ class FeatureStoreError(AsahiException):
 
 class ObservabilityError(AsahiException):
     """Raised when a metrics, analytics, or forecasting operation fails."""
+
+
+class BudgetExceededError(AsahiException):
+    """Raised when an organization exceeds its cost or request budget."""
+
+
+class PermissionDeniedError(AsahiException):
+    """Raised when a user lacks the required permission for an action."""
+
+
+class ComplianceViolationError(AsahiException):
+    """Raised when a request violates a compliance policy."""
