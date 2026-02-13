@@ -14,6 +14,7 @@ from typing import Any, Dict, List, Literal, Optional, Tuple
 
 from pydantic import BaseModel, Field
 
+from src.config import get_settings
 from src.exceptions import ComplianceViolationError
 from src.governance.audit import AuditLogger
 
@@ -65,8 +66,12 @@ class ComplianceConfig(BaseModel):
         model_region_map: Mapping of model names to their data regions.
     """
 
-    pii_detection_enabled: bool = True
-    default_retention_days: int = Field(default=365, ge=1)
+    pii_detection_enabled: bool = Field(
+        default_factory=lambda: get_settings().governance.compliance_pii_detection
+    )
+    default_retention_days: int = Field(
+        default_factory=lambda: get_settings().governance.compliance_default_retention_days, ge=1
+    )
     model_region_map: Dict[str, str] = Field(
         default_factory=lambda: {
             "gpt-4-turbo": "us",

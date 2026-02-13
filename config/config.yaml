@@ -49,6 +49,8 @@ tracking:
   enable_kafka: false
   kafka_bootstrap_servers: "localhost:9092"
   kafka_topic: "asahi_inference_events"
+  baseline_input_rate: 0.010   # GPT-4 Turbo $/1k input tokens
+  baseline_output_rate: 0.030  # GPT-4 Turbo $/1k output tokens
 
 observability:
   enabled: true
@@ -63,6 +65,35 @@ observability:
     cache_degradation_threshold: 0.5
     quality_drop_threshold: 0.5
     rolling_window_hours: 24
+  forecasting:
+    ema_span_days: 7
+    min_data_points: 3
+    stable_threshold_pct: 5.0
+
+embeddings:
+  provider: cohere
+  model_name: embed-english-v3.0
+  api_key_env: COHERE_API_KEY
+  dimension: 1024
+  batch_size: 96
+  timeout_seconds: 30
+  max_retries: 3
+
+governance:
+  encryption_key_env: ASAHI_ENCRYPTION_KEY
+  pbkdf2_iterations: 480000
+  salt_length: 16
+  audit_storage_dir: "data/audit"
+  audit_max_entries: 10000
+  audit_enable_hash_chain: true
+  auth_api_key_required: false
+  auth_key_expiry_days: 90
+  auth_key_prefix: ask
+  budget_tracking_window_hours: 24
+  default_max_requests_per_day: 1000
+  tenancy_cache_namespace_prefix: tenant
+  compliance_pii_detection: true
+  compliance_default_retention_days: 365
 
 logging:
   level: "INFO"

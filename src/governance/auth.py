@@ -15,6 +15,8 @@ from typing import Any, Dict, List, Optional
 import bcrypt
 from pydantic import BaseModel, Field
 
+from src.config import get_settings
+
 logger = logging.getLogger(__name__)
 
 
@@ -85,7 +87,14 @@ class AuthMiddleware:
     """
 
     def __init__(self, config: Optional[AuthConfig] = None) -> None:
-        self._config = config or AuthConfig()
+        if config is None:
+            _s = get_settings().governance
+            config = AuthConfig(
+                api_key_required=_s.auth_api_key_required,
+                key_expiry_days=_s.auth_key_expiry_days,
+                key_prefix=_s.auth_key_prefix,
+            )
+        self._config = config
         self._lock = threading.Lock()
         # key_display_prefix -> _StoredKey
         self._keys: Dict[str, _StoredKey] = {}

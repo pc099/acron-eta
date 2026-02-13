@@ -13,6 +13,8 @@ from typing import Dict, Optional
 
 from pydantic import BaseModel, Field
 
+from src.config import get_settings
+
 logger = logging.getLogger(__name__)
 
 
@@ -69,9 +71,9 @@ class Cache:
             Defaults to 86400 (24 hours).
     """
 
-    def __init__(self, ttl_seconds: int = 86400) -> None:
+    def __init__(self, ttl_seconds: Optional[int] = None) -> None:
         self._store: Dict[str, CacheEntry] = {}
-        self._ttl_seconds = ttl_seconds
+        self._ttl_seconds = ttl_seconds if ttl_seconds is not None else get_settings().cache.ttl_seconds
         self._hits: int = 0
         self._misses: int = 0
         self._total_cost_saved: float = 0.0

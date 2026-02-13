@@ -14,6 +14,7 @@ import json
 import os
 import sys
 
+from src.config import get_settings
 from src.core.optimizer import InferenceOptimizer
 
 
@@ -154,6 +155,8 @@ def cmd_api(args: argparse.Namespace) -> None:
 
 def main() -> None:
     """Parse CLI arguments and dispatch to the appropriate command."""
+    settings = get_settings()
+
     parser = argparse.ArgumentParser(
         description="Asahi - Inference Cost Optimizer"
     )
@@ -161,14 +164,14 @@ def main() -> None:
 
     p_infer = subparsers.add_parser("infer", help="Run single inference")
     p_infer.add_argument("--prompt", required=True, help="Input prompt")
-    p_infer.add_argument("--quality", type=float, default=3.5)
-    p_infer.add_argument("--latency", type=int, default=300)
+    p_infer.add_argument("--quality", type=float, default=settings.routing.default_quality_threshold)
+    p_infer.add_argument("--latency", type=int, default=settings.routing.default_latency_budget_ms)
     p_infer.add_argument("--mock", action="store_true", help="Use mock inference")
 
     p_test = subparsers.add_parser("test", help="Run test queries")
     p_test.add_argument("--num_queries", type=int, default=50)
-    p_test.add_argument("--quality", type=float, default=3.5)
-    p_test.add_argument("--latency", type=int, default=300)
+    p_test.add_argument("--quality", type=float, default=settings.routing.default_quality_threshold)
+    p_test.add_argument("--latency", type=int, default=settings.routing.default_latency_budget_ms)
     p_test.add_argument("--mock", action="store_true", help="Use mock inference")
 
     p_bench = subparsers.add_parser("benchmark", help="Baseline vs optimized")
@@ -178,7 +181,7 @@ def main() -> None:
     subparsers.add_parser("metrics", help="Show saved metrics")
 
     p_api = subparsers.add_parser("api", help="Start REST API server")
-    p_api.add_argument("--port", type=int, default=8000)
+    p_api.add_argument("--port", type=int, default=settings.api.port)
     p_api.add_argument("--mock", action="store_true", help="Use mock inference")
 
     args = parser.parse_args()

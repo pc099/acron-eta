@@ -9,7 +9,7 @@ from src.governance.auth import AuthConfig, AuthMiddleware, AuthResult
 
 @pytest.fixture
 def auth() -> AuthMiddleware:
-    return AuthMiddleware()
+    return AuthMiddleware(config=AuthConfig(api_key_required=True))
 
 
 # ── Key generation ─────────────────────────────────────

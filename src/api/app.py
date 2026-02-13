@@ -15,6 +15,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 from src.api.middleware import RateLimiter
+from src.config import get_settings
 from src.api.schemas import (
     AnalyticsResponse,
     CostBreakdownRequest,
@@ -58,17 +59,21 @@ def create_app(use_mock: bool = False) -> FastAPI:
     Returns:
         Configured FastAPI instance.
     """
+    settings = get_settings()
+
     app = FastAPI(
         title="Asahi",
         description="LLM Inference Cost Optimization API",
-        version="1.0.0",
+        version=settings.api.version,
     )
 
     # -- Shared state --
     app.state.optimizer = InferenceOptimizer(use_mock=use_mock)
     app.state.start_time = time.time()
-    app.state.version = "1.0.0"
-    app.state.rate_limiter = RateLimiter(max_requests=100, window_seconds=60)
+    app.state.version = settings.api.version
+    app.state.rate_limiter = RateLimiter(
+        max_requests=settings.api.rate_limit_per_minute, window_seconds=60
+    )
 
     # -- Observability (Phase 6) --
     app.state.metrics_collector = MetricsCollector()
@@ -95,14 +100,12 @@ def create_app(use_mock: bool = False) -> FastAPI:
         audit_logger=app.state.audit_logger
     )
     app.state.tenancy_manager = MultiTenancyManager()
-    app.state.auth_middleware = AuthMiddleware(
-        config=AuthConfig(api_key_required=False)
-    )
+    app.state.auth_middleware = AuthMiddleware()
 
     # -- CORS --
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
+        allow_origins=settings.api.cors_origins,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],

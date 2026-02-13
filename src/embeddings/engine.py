@@ -14,6 +14,7 @@ from typing import List, Literal, Optional
 import numpy as np
 from pydantic import BaseModel, Field
 
+from src.config import get_settings
 from src.exceptions import ConfigurationError, EmbeddingError
 
 logger = logging.getLogger(__name__)
@@ -32,13 +33,27 @@ class EmbeddingConfig(BaseModel):
         max_retries: Retry count on transient failures.
     """
 
-    provider: Literal["cohere", "openai", "ollama", "mock"] = "cohere"
-    model_name: str = "embed-english-v3.0"
-    api_key_env: str = "COHERE_API_KEY"
-    dimension: int = Field(default=1024, gt=0)
-    batch_size: int = Field(default=96, gt=0)
-    timeout_seconds: int = Field(default=30, gt=0)
-    max_retries: int = Field(default=3, ge=0)
+    provider: Literal["cohere", "openai", "ollama", "mock"] = Field(
+        default_factory=lambda: get_settings().embeddings.provider
+    )
+    model_name: str = Field(
+        default_factory=lambda: get_settings().embeddings.model_name
+    )
+    api_key_env: str = Field(
+        default_factory=lambda: get_settings().embeddings.api_key_env
+    )
+    dimension: int = Field(
+        default_factory=lambda: get_settings().embeddings.dimension, gt=0
+    )
+    batch_size: int = Field(
+        default_factory=lambda: get_settings().embeddings.batch_size, gt=0
+    )
+    timeout_seconds: int = Field(
+        default_factory=lambda: get_settings().embeddings.timeout_seconds, gt=0
+    )
+    max_retries: int = Field(
+        default_factory=lambda: get_settings().embeddings.max_retries, ge=0
+    )
 
 
 class EmbeddingEngine:

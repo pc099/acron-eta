@@ -16,6 +16,7 @@ from typing import Any, Dict, List, Literal, Optional, Protocol, runtime_checkab
 
 from pydantic import BaseModel, Field
 
+from src.config import get_settings
 from src.exceptions import FeatureConfigError, FeatureStoreError
 
 logger = logging.getLogger(__name__)
@@ -39,7 +40,7 @@ class FeatureStoreConfig(BaseModel):
     provider: Literal["feast", "tecton", "custom", "local"] = "local"
     timeout_ms: int = Field(default=200, ge=0)
     fallback_on_timeout: bool = True
-    local_data_path: str = "data/features.json"
+    local_data_path: str = Field(default_factory=lambda: get_settings().feature_store.local_data_path)
     feast_repo_path: str = ""
     feast_project: str = "asahi"
     tecton_api_key_env: str = "TECTON_API_KEY"

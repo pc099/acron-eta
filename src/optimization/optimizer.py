@@ -11,6 +11,7 @@ from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import BaseModel, Field
 
+from src.config import get_settings
 from src.models.registry import estimate_tokens
 from src.optimization.analyzer import AnalyzerConfig, ContextAnalyzer, SegmentScore
 from src.optimization.compressor import CompressorConfig, PromptCompressor
@@ -31,11 +32,15 @@ class OptimizerConfig(BaseModel):
         max_few_shot_examples: Max examples to keep after selection.
     """
 
-    max_quality_risk: Literal["none", "low", "medium", "high"] = "medium"
+    max_quality_risk: Literal["none", "low", "medium", "high"] = Field(
+        default_factory=lambda: get_settings().optimization.max_quality_risk
+    )
     enable_context_analysis: bool = True
     enable_compression: bool = True
     enable_few_shot_selection: bool = True
-    max_few_shot_examples: int = Field(default=3, ge=1)
+    max_few_shot_examples: int = Field(
+        default_factory=lambda: get_settings().optimization.max_few_shot_examples, ge=1
+    )
 
 
 class OptimizationResult(BaseModel):

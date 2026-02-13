@@ -19,6 +19,8 @@ from uuid import uuid4
 
 from pydantic import BaseModel, Field
 
+from src.config import get_settings
+
 logger = logging.getLogger(__name__)
 
 
@@ -78,7 +80,14 @@ class AuditLogger:
     """
 
     def __init__(self, config: Optional[AuditConfig] = None) -> None:
-        self._config = config or AuditConfig()
+        if config is None:
+            _s = get_settings().governance
+            config = AuditConfig(
+                storage_dir=_s.audit_storage_dir,
+                max_entries_in_memory=_s.audit_max_entries,
+                enable_hash_chain=_s.audit_enable_hash_chain,
+            )
+        self._config = config
         self._lock = threading.Lock()
         self._entries: Dict[str, List[AuditEntry]] = defaultdict(list)
         logger.info("AuditLogger initialised", extra={})

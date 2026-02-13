@@ -13,6 +13,7 @@ from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import BaseModel, Field
 
+from src.config import get_settings
 from src.exceptions import ObservabilityError
 from src.observability.analytics import AnalyticsEngine
 
@@ -81,7 +82,14 @@ class ForecastingModel:
         config: Optional[ForecastConfig] = None,
     ) -> None:
         self._analytics = analytics
-        self._config = config or ForecastConfig()
+        if config is None:
+            _s = get_settings().observability.forecasting
+            config = ForecastConfig(
+                ema_span_days=_s.ema_span_days,
+                min_data_points=_s.min_data_points,
+                stable_threshold_pct=_s.stable_threshold_pct,
+            )
+        self._config = config
 
     # ------------------------------------------------------------------
     # Cost prediction

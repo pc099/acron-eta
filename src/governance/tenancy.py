@@ -14,6 +14,8 @@ from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import BaseModel, Field
 
+from src.config import get_settings
+
 logger = logging.getLogger(__name__)
 
 
@@ -28,7 +30,9 @@ class TenancyConfig(BaseModel):
         plan_limits: Per-plan resource limits.
     """
 
-    cache_namespace_prefix: str = "tenant"
+    cache_namespace_prefix: str = Field(
+        default_factory=lambda: get_settings().governance.tenancy_cache_namespace_prefix
+    )
     plan_limits: Dict[str, Dict[str, int]] = Field(
         default_factory=lambda: {
             "starter": {

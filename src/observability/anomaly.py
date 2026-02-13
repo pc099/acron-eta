@@ -12,6 +12,7 @@ from typing import Dict, List, Literal, Optional
 
 from pydantic import BaseModel, Field
 
+from src.config import get_settings
 from src.exceptions import ObservabilityError
 from src.observability.analytics import AnalyticsEngine
 
@@ -96,7 +97,17 @@ class AnomalyDetector:
         config: Optional[AnomalyConfig] = None,
     ) -> None:
         self._analytics = analytics
-        self._config = config or AnomalyConfig()
+        if config is None:
+            _s = get_settings().observability.anomaly
+            config = AnomalyConfig(
+                cost_spike_threshold=_s.cost_spike_threshold,
+                latency_spike_threshold=_s.latency_spike_threshold,
+                error_rate_threshold=_s.error_rate_threshold,
+                cache_degradation_threshold=_s.cache_degradation_threshold,
+                quality_drop_threshold=_s.quality_drop_threshold,
+                rolling_window_hours=_s.rolling_window_hours,
+            )
+        self._config = config
 
     # ------------------------------------------------------------------
     # Aggregate check

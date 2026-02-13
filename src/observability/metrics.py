@@ -15,6 +15,7 @@ from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
+from src.config import get_settings
 from src.exceptions import ObservabilityError
 
 logger = logging.getLogger(__name__)
@@ -78,7 +79,15 @@ class MetricsCollector:
     _BATCH_SIZE_BUCKETS: List[float] = [1, 2, 3, 5, 8, 10, 15, 20]
 
     def __init__(self, config: Optional[MetricsConfig] = None) -> None:
-        self._config = config or MetricsConfig()
+        if config is None:
+            _s = get_settings().observability
+            config = MetricsConfig(
+                enabled=_s.enabled,
+                collection_interval_seconds=_s.collection_interval_seconds,
+                retention_hours=_s.retention_hours,
+                export_format=_s.export_format,
+            )
+        self._config = config
         self._lock = threading.Lock()
 
         # Counters  (label_key -> count)

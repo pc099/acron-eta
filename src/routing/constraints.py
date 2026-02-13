@@ -11,6 +11,8 @@ from typing import Dict, Optional
 
 from pydantic import BaseModel, Field
 
+from src.config import get_settings
+
 logger = logging.getLogger(__name__)
 
 
@@ -47,28 +49,16 @@ class RoutingDecision(BaseModel):
     fallback_used: bool = False
 
 
+def _load_routing_maps():
+    """Load routing maps from central config."""
+    _s = get_settings().routing
+    return _s.quality_map, _s.latency_map, _s.task_overrides
+
+
 # Quality preference -> quality threshold mapping
-QUALITY_MAP: Dict[str, float] = {
-    "low": 3.0,
-    "medium": 3.5,
-    "high": 4.0,
-    "max": 4.5,
-}
-
 # Latency preference -> latency budget (ms) mapping
-LATENCY_MAP: Dict[str, int] = {
-    "slow": 2000,
-    "normal": 500,
-    "fast": 300,
-    "instant": 150,
-}
-
 # Task-type overrides: task_type -> (min_quality, max_latency)
-TASK_OVERRIDES: Dict[str, Dict[str, float]] = {
-    "coding": {"min_quality": 4.0, "max_latency": 500},
-    "reasoning": {"min_quality": 4.0, "max_latency": 500},
-    "legal": {"min_quality": 4.2, "max_latency": 2000},
-}
+QUALITY_MAP, LATENCY_MAP, TASK_OVERRIDES = _load_routing_maps()
 
 
 class ConstraintInterpreter:

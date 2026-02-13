@@ -17,6 +17,7 @@ from dotenv import load_dotenv
 from pydantic import BaseModel, Field
 
 from src.cache.exact import Cache, CacheEntry
+from src.config import get_settings
 from src.exceptions import ModelNotFoundError, ProviderError
 from src.models.registry import (
     ModelProfile,
@@ -98,8 +99,8 @@ class InferenceOptimizer:
         self,
         prompt: str,
         task_id: Optional[str] = None,
-        latency_budget_ms: int = 300,
-        quality_threshold: float = 3.5,
+        latency_budget_ms: Optional[int] = None,
+        quality_threshold: Optional[float] = None,
         cost_budget: Optional[float] = None,
         user_id: Optional[str] = None,
     ) -> InferenceResult:
@@ -116,6 +117,12 @@ class InferenceOptimizer:
         Returns:
             InferenceResult with response, cost, and metadata.
         """
+        _s = get_settings().routing
+        if latency_budget_ms is None:
+            latency_budget_ms = _s.default_latency_budget_ms
+        if quality_threshold is None:
+            quality_threshold = _s.default_quality_threshold
+
         request_id = uuid.uuid4().hex[:12]
 
         if not prompt or not prompt.strip():

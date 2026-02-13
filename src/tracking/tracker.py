@@ -16,6 +16,8 @@ from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
+from src.config import get_settings
+
 logger = logging.getLogger(__name__)
 
 
@@ -66,8 +68,8 @@ class EventTracker:
             not exist.
     """
 
-    def __init__(self, log_dir: Path = Path("data/logs")) -> None:
-        self._log_dir = log_dir
+    def __init__(self, log_dir: Optional[Path] = None) -> None:
+        self._log_dir = log_dir if log_dir is not None else Path(get_settings().tracking.log_dir)
         self._events: List[InferenceEvent] = []
 
         try:
@@ -140,8 +142,9 @@ class EventTracker:
             cost_by_model[model] = cost_by_model.get(model, 0.0) + event.cost
             requests_by_model[model] = requests_by_model.get(model, 0) + 1
 
-        gpt4_input_rate = 0.010
-        gpt4_output_rate = 0.030
+        _s = get_settings().tracking
+        gpt4_input_rate = _s.baseline_input_rate
+        gpt4_output_rate = _s.baseline_output_rate
         gpt4_total = sum(
             (e.input_tokens * gpt4_input_rate + e.output_tokens * gpt4_output_rate)
             / 1000

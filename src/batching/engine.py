@@ -11,6 +11,7 @@ from typing import List, Optional
 
 from pydantic import BaseModel, Field
 
+from src.config import get_settings
 from src.exceptions import BatchingError
 from src.models.registry import ModelRegistry, estimate_tokens
 
@@ -70,7 +71,16 @@ class BatchEngine:
         config: Optional[BatchConfig] = None,
         model_registry: Optional[ModelRegistry] = None,
     ) -> None:
-        self._config = config or BatchConfig()
+        if config is None:
+            _s = get_settings().batching
+            config = BatchConfig(
+                min_batch_size=_s.min_batch_size,
+                max_batch_size=_s.max_batch_size,
+                max_wait_ms=_s.max_wait_ms,
+                latency_threshold_ms=_s.latency_threshold_ms,
+                eligible_task_types=_s.eligible_task_types,
+            )
+        self._config = config
         self._registry = model_registry
 
         logger.info(

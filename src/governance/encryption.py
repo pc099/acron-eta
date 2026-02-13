@@ -17,6 +17,7 @@ from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from cryptography.hazmat.primitives import hashes
 from pydantic import BaseModel, Field
 
+from src.config import get_settings
 from src.exceptions import ConfigurationError
 
 logger = logging.getLogger(__name__)
@@ -51,7 +52,14 @@ class EncryptionManager:
     """
 
     def __init__(self, config: Optional[EncryptionConfig] = None) -> None:
-        self._config = config or EncryptionConfig()
+        if config is None:
+            _s = get_settings().governance
+            config = EncryptionConfig(
+                key_env=_s.encryption_key_env,
+                pbkdf2_iterations=_s.pbkdf2_iterations,
+                salt_length=_s.salt_length,
+            )
+        self._config = config
         self._lock = threading.Lock()
         self._passphrase = self._load_passphrase(self._config.key_env)
         logger.info(
