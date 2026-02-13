@@ -2,9 +2,11 @@
 Pydantic request/response models for the Asahi REST API.
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import BaseModel, Field
+
+RoutingMode = Literal["autopilot", "guided", "explicit"]
 
 
 class InferRequest(BaseModel):
@@ -17,6 +19,11 @@ class InferRequest(BaseModel):
         quality_threshold: Minimum quality score (0.0-5.0).
         cost_budget: Optional maximum dollar cost for this request.
         user_id: Optional caller identity.
+        routing_mode: Routing mode: "autopilot", "guided", or "explicit".
+        quality_preference: Quality preference for GUIDED mode ("low", "medium", "high", "max").
+        latency_preference: Latency preference for GUIDED mode ("low", "medium", "high").
+        model_override: Model name for EXPLICIT mode.
+        document_id: Optional document identifier for Tier 3 workflow decomposition.
     """
 
     prompt: str = Field(
@@ -36,6 +43,21 @@ class InferRequest(BaseModel):
     )
     user_id: Optional[str] = Field(
         default=None, description="Caller identity"
+    )
+    routing_mode: RoutingMode = Field(
+        default="autopilot", description="Routing mode"
+    )
+    quality_preference: Optional[str] = Field(
+        default=None, description="Quality preference for GUIDED mode"
+    )
+    latency_preference: Optional[str] = Field(
+        default=None, description="Latency preference for GUIDED mode"
+    )
+    model_override: Optional[str] = Field(
+        default=None, description="Model name for EXPLICIT mode"
+    )
+    document_id: Optional[str] = Field(
+        default=None, description="Document ID for Tier 3 caching"
     )
 
 

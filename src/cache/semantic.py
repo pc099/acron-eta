@@ -114,11 +114,28 @@ class SemanticCache:
                 hit=False, reason="No entries in vector DB"
             )
 
+        # Use the most lenient threshold from either the query's task type
+        # or the cached entry's task type to handle semantically identical queries
+        # that were detected as different task types
         threshold = self._tuner.get_threshold(task_type, cost_sensitivity)
 
         for result in results:
+            # Check similarity against threshold
             if not self._similarity.above_threshold(result.score, threshold):
-                continue
+                # Also check against the cached entry's task type threshold
+                # This handles cases where semantically identical queries are
+                # detected as different task types (e.g., "What is X?" vs "Explain X")
+                cached_task_type = result.metadata.get("task_type", task_type)
+                if cached_task_type != task_type:
+                    cached_threshold = self._tuner.get_threshold(
+                        cached_task_type, cost_sensitivity
+                    )
+                    # Use the more lenient (lower) threshold
+                    threshold = min(threshold, cached_threshold)
+                    if not self._similarity.above_threshold(result.score, threshold):
+                        continue
+                else:
+                    continue
 
             should_cache, reason = self._mismatch.should_use_cache(
                 similarity=result.score,

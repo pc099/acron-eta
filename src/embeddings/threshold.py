@@ -16,13 +16,16 @@ logger = logging.getLogger(__name__)
 CostSensitivity = Literal["high", "medium", "low"]
 
 # Default thresholds: task_type -> {sensitivity -> threshold}
+# "high" sensitivity = more aggressive caching (lower threshold)
+# "low" sensitivity = more conservative caching (higher threshold)
 DEFAULT_THRESHOLDS: Dict[str, Dict[str, float]] = {
     "faq": {"high": 0.70, "medium": 0.80, "low": 0.90},
     "summarization": {"high": 0.80, "medium": 0.85, "low": 0.92},
     "reasoning": {"high": 0.85, "medium": 0.90, "low": 0.95},
     "coding": {"high": 0.90, "medium": 0.93, "low": 0.97},
     "legal": {"high": 0.88, "medium": 0.92, "low": 0.96},
-    "default": {"high": 0.80, "medium": 0.85, "low": 0.92},
+    "general": {"high": 0.75, "medium": 0.80, "low": 0.90},  # Lowered from default 0.85
+    "default": {"high": 0.75, "medium": 0.80, "low": 0.90},  # Lowered from 0.85 to better match semantically identical queries
 }
 
 

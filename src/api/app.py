@@ -5,6 +5,7 @@ Creates and configures the FastAPI app with all routes, middleware,
 and shared state.  Includes analytics (Phase 6) and governance (Phase 7).
 """
 
+import json
 import logging
 import time
 import uuid
@@ -26,15 +27,34 @@ from src.api.schemas import (
     InferResponse,
     TrendRequest,
 )
+from src.cache.intermediate import IntermediateCache
+from src.cache.semantic import SemanticCache
+from src.cache.workflow import WorkflowDecomposer
 from src.core.optimizer import InferenceOptimizer, InferenceResult
+from src.embeddings.engine import EmbeddingEngine, EmbeddingConfig
+from src.embeddings.mismatch import MismatchCostCalculator
+from src.embeddings.similarity import SimilarityCalculator
+from src.embeddings.threshold import AdaptiveThresholdTuner
+from src.embeddings.vector_store import InMemoryVectorDB
 from src.exceptions import (
+    AsahiException,
+    BatchingError,
     BudgetExceededError,
     ComplianceViolationError,
+    ConfigurationError,
+    EmbeddingError,
+    FeatureConfigError,
+    FeatureStoreError,
+    ModelNotFoundError,
     NoModelsAvailableError,
     ObservabilityError,
     PermissionDeniedError,
     ProviderError,
+    VectorDBError,
 )
+from src.routing.constraints import ConstraintInterpreter
+from src.routing.router import AdvancedRouter, Router
+from src.routing.task_detector import TaskTypeDetector
 from src.governance.audit import AuditLogger
 from src.governance.auth import AuthMiddleware, AuthConfig
 from src.governance.compliance import ComplianceManager
@@ -67,8 +87,77 @@ def create_app(use_mock: bool = False) -> FastAPI:
         version=settings.api.version,
     )
 
+     # -- Phase 2 components initialization (optional, graceful degradation) --
+    semantic_cache: Optional[SemanticCache] = None
+    intermediate_cache: Optional[IntermediateCache] = None
+    workflow_decomposer: Optional[WorkflowDecomposer] = None
+    advanced_router: Optional[AdvancedRouter] = None
+    task_detector: Optional[TaskTypeDetector] = None
+    constraint_interpreter: Optional[ConstraintInterpreter] = None
+
+    try:
+        # Initialize embedding engine for Tier 2
+        embedding_config = EmbeddingConfig()
+        embedding_engine = EmbeddingEngine(embedding_config)
+
+        # Initialize vector DB (in-memory for now, can be swapped for Pinecone)
+        vector_db = InMemoryVectorDB()
+
+        # Initialize Tier 2 semantic cache dependencies
+        similarity_calc = SimilarityCalculator()
+        mismatch_calc = MismatchCostCalculator()
+        threshold_tuner = AdaptiveThresholdTuner()
+
+        # Create semantic cache
+        semantic_cache = SemanticCache(
+            embedding_engine=embedding_engine,
+            vector_db=vector_db,
+            similarity_calc=similarity_calc,
+            mismatch_calc=mismatch_calc,
+            threshold_tuner=threshold_tuner,
+            ttl_seconds=settings.cache.ttl_seconds,
+        )
+
+        # Initialize Tier 3 components
+        intermediate_cache = IntermediateCache(
+            ttl_seconds=settings.cache.ttl_seconds
+        )
+        workflow_decomposer = WorkflowDecomposer()
+
+        # Initialize advanced routing components
+        task_detector = TaskTypeDetector()
+        constraint_interpreter = ConstraintInterpreter()
+        
+        # Create base router and registry for advanced router
+        from src.models.registry import ModelRegistry
+        registry = ModelRegistry()
+        base_router = Router(registry)
+        
+        advanced_router = AdvancedRouter(
+            registry=registry,
+            base_router=base_router,
+            task_detector=task_detector,
+            constraint_interpreter=constraint_interpreter,
+        )
+
+        logger.info("Phase 2 components initialized successfully")
+    except Exception as exc:
+        logger.warning(
+            "Phase 2 components initialization failed, continuing with Phase 1 only",
+            extra={"error": str(exc)},
+            exc_info=True,
+        )
+
     # -- Shared state --
-    app.state.optimizer = InferenceOptimizer(use_mock=use_mock)
+    app.state.optimizer = InferenceOptimizer(
+        use_mock=use_mock,
+        semantic_cache=semantic_cache,
+        intermediate_cache=intermediate_cache,
+        workflow_decomposer=workflow_decomposer,
+        advanced_router=advanced_router,
+        task_detector=task_detector,
+        constraint_interpreter=constraint_interpreter,
+    )
     app.state.start_time = time.time()
     app.state.version = settings.api.version
     app.state.rate_limiter = RateLimiter(
@@ -156,34 +245,67 @@ def create_app(use_mock: bool = False) -> FastAPI:
             )
         return await call_next(request)
 
-    # -- Exception handlers (Phase 7) --
-    @app.exception_handler(BudgetExceededError)
-    async def budget_exceeded_handler(
-        request: Request, exc: BudgetExceededError
+    # -- Global exception handlers --
+    @app.exception_handler(AsahiException)
+    async def asahi_exception_handler(
+        request: Request, exc: AsahiException
     ) -> Response:
+        """Handle all AsahiException subclasses with consistent JSON."""
+        request_id = getattr(request.state, "request_id", "unknown")
+
+        # Map exception types to HTTP status codes
+        status_map = {
+            NoModelsAvailableError: 503,
+            ProviderError: 503,
+            ModelNotFoundError: 400,
+            ConfigurationError: 400,
+            FeatureConfigError: 400,
+            EmbeddingError: 502,
+            VectorDBError: 502,
+            FeatureStoreError: 502,
+            ObservabilityError: 502,
+            BatchingError: 502,
+            BudgetExceededError: 429,
+            PermissionDeniedError: 403,
+            ComplianceViolationError: 403,
+        }
+        status_code = status_map.get(type(exc), 500)
+
+        # Convert exception class name to error type (e.g., "NoModelsAvailableError" -> "nomodelsavailable")
+        error_type = exc.__class__.__name__.replace("Error", "").lower()
+
         return Response(
-            content=f'{{"error":"budget_exceeded","message":"{exc}"}}',
-            status_code=429,
+            content=json.dumps(
+                {
+                    "error": error_type,
+                    "message": str(exc),
+                    "request_id": request_id,
+                }
+            ),
+            status_code=status_code,
             media_type="application/json",
         )
 
-    @app.exception_handler(PermissionDeniedError)
-    async def permission_denied_handler(
-        request: Request, exc: PermissionDeniedError
+    @app.exception_handler(Exception)
+    async def generic_exception_handler(
+        request: Request, exc: Exception
     ) -> Response:
-        return Response(
-            content=f'{{"error":"forbidden","message":"{exc}"}}',
-            status_code=403,
-            media_type="application/json",
+        """Catch-all handler for unhandled exceptions."""
+        request_id = getattr(request.state, "request_id", "unknown")
+        logger.error(
+            "Unhandled exception",
+            extra={"request_id": request_id, "error": str(exc)},
+            exc_info=True,
         )
-
-    @app.exception_handler(ComplianceViolationError)
-    async def compliance_violation_handler(
-        request: Request, exc: ComplianceViolationError
-    ) -> Response:
         return Response(
-            content=f'{{"error":"compliance_violation","message":"{exc}"}}',
-            status_code=403,
+            content=json.dumps(
+                {
+                    "error": "internal_server_error",
+                    "message": "An unexpected error occurred",
+                    "request_id": request_id,
+                }
+            ),
+            status_code=500,
             media_type="application/json",
         )
 
@@ -206,42 +328,19 @@ def create_app(use_mock: bool = False) -> FastAPI:
             request.state, "request_id", uuid.uuid4().hex[:12]
         )
 
-        try:
-            result: InferenceResult = optimizer.infer(
-                prompt=body.prompt,
-                task_id=body.task_id,
-                latency_budget_ms=body.latency_budget_ms,
-                quality_threshold=body.quality_threshold,
-                cost_budget=body.cost_budget,
-                user_id=body.user_id,
-            )
-        except NoModelsAvailableError as exc:
-            logger.error(
-                "No models available",
-                extra={"request_id": request_id, "error": str(exc)},
-            )
-            raise HTTPException(
-                status_code=503,
-                detail={
-                    "error": "service_unavailable",
-                    "message": str(exc),
-                    "request_id": request_id,
-                },
-            ) from exc
-        except ProviderError as exc:
-            logger.error(
-                "All providers unavailable",
-                extra={"request_id": request_id, "error": str(exc)},
-            )
-            raise HTTPException(
-                status_code=503,
-                detail={
-                    "error": "service_unavailable",
-                    "message": str(exc),
-                    "request_id": request_id,
-                    "retry_after_seconds": 30,
-                },
-            ) from exc
+        result: InferenceResult = optimizer.infer(
+            prompt=body.prompt,
+            task_id=body.task_id,
+            latency_budget_ms=body.latency_budget_ms,
+            quality_threshold=body.quality_threshold,
+            cost_budget=body.cost_budget,
+            user_id=body.user_id,
+            routing_mode=body.routing_mode,
+            quality_preference=body.quality_preference,
+            latency_preference=body.latency_preference,
+            model_override=body.model_override,
+            document_id=body.document_id,
+        )
 
         return InferResponse(
             request_id=request_id,
@@ -315,10 +414,7 @@ def create_app(use_mock: bool = False) -> FastAPI:
     ) -> AnalyticsResponse:
         """Return cost breakdown grouped by model, task type, or tier."""
         engine: AnalyticsEngine = request.app.state.analytics_engine
-        try:
-            data = engine.cost_breakdown(period=period, group_by=group_by)  # type: ignore[arg-type]
-        except ObservabilityError as exc:
-            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        data = engine.cost_breakdown(period=period, group_by=group_by)  # type: ignore[arg-type]
         return AnalyticsResponse(data=data)
 
     @app.get(
@@ -334,10 +430,7 @@ def create_app(use_mock: bool = False) -> FastAPI:
     ) -> AnalyticsResponse:
         """Return time-series trend data for the given metric."""
         engine: AnalyticsEngine = request.app.state.analytics_engine
-        try:
-            data = engine.trend(metric=metric, period=period, intervals=intervals)
-        except ObservabilityError as exc:
-            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        data = engine.trend(metric=metric, period=period, intervals=intervals)
         return AnalyticsResponse(data=data)
 
     @app.get(

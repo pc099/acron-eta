@@ -11,13 +11,21 @@ import os
 import random
 import time
 import uuid
-from typing import Optional, Tuple
+from typing import List, Literal, Optional, Tuple
 
 from dotenv import load_dotenv
 from pydantic import BaseModel, Field
 
 from src.cache.exact import Cache, CacheEntry
+from src.cache.intermediate import IntermediateCache
+from src.cache.semantic import SemanticCache, SemanticCacheResult
+from src.cache.workflow import WorkflowDecomposer, WorkflowStep
 from src.config import get_settings
+from src.embeddings.engine import EmbeddingEngine, EmbeddingConfig
+from src.embeddings.mismatch import MismatchCostCalculator
+from src.embeddings.similarity import SimilarityCalculator
+from src.embeddings.threshold import AdaptiveThresholdTuner
+from src.embeddings.vector_store import InMemoryVectorDB, VectorDatabase
 from src.exceptions import ModelNotFoundError, ProviderError
 from src.models.registry import (
     ModelProfile,
@@ -25,8 +33,13 @@ from src.models.registry import (
     calculate_cost,
     estimate_tokens,
 )
-from src.routing.constraints import RoutingConstraints, RoutingDecision
-from src.routing.router import Router
+from src.routing.constraints import (
+    ConstraintInterpreter,
+    RoutingConstraints,
+    RoutingDecision,
+)
+from src.routing.router import AdvancedRouter, AdvancedRoutingDecision, Router, RoutingMode
+from src.routing.task_detector import TaskTypeDetector
 from src.tracking.tracker import EventTracker, InferenceEvent
 
 load_dotenv()
@@ -67,13 +80,25 @@ class InferenceOptimizer:
     inference execution, cost calculation, event logging, and
     response assembly.
 
+    Supports three-tier caching (exact match, semantic similarity,
+    intermediate results) and advanced routing modes (AUTOPILOT,
+    GUIDED, EXPLICIT).
+
     Args:
         registry: Model registry (injected).
-        router: Routing engine (injected).
-        cache: Exact-match cache (injected).
+        router: Basic routing engine (injected, optional if advanced_router provided).
+        cache: Exact-match cache (Tier 1, injected).
         tracker: Event tracker (injected).
         use_mock: If ``True``, simulate API calls instead of calling
             real providers.
+        semantic_cache: Tier 2 semantic cache (optional).
+        intermediate_cache: Tier 3 intermediate cache (optional).
+        workflow_decomposer: Workflow decomposer for Tier 3 (optional).
+        advanced_router: Advanced router with 3 modes (optional).
+        task_detector: Task type detector (optional, auto-initialized if advanced_router used).
+        constraint_interpreter: Constraint interpreter (optional, auto-initialized if advanced_router used).
+        enable_tier2: Enable Tier 2 semantic caching (default: True if semantic_cache provided).
+        enable_tier3: Enable Tier 3 intermediate caching (default: True if components provided).
     """
 
     def __init__(
@@ -83,13 +108,49 @@ class InferenceOptimizer:
         cache: Optional[Cache] = None,
         tracker: Optional[EventTracker] = None,
         use_mock: bool = False,
+        semantic_cache: Optional[SemanticCache] = None,
+        intermediate_cache: Optional[IntermediateCache] = None,
+        workflow_decomposer: Optional[WorkflowDecomposer] = None,
+        advanced_router: Optional[AdvancedRouter] = None,
+        task_detector: Optional[TaskTypeDetector] = None,
+        constraint_interpreter: Optional[ConstraintInterpreter] = None,
+        enable_tier2: Optional[bool] = None,
+        enable_tier3: Optional[bool] = None,
     ) -> None:
         self._registry = registry or ModelRegistry()
-        self._router = router or Router(self._registry)
         self._cache = cache or Cache()
         self._tracker = tracker or EventTracker()
         self._use_mock = use_mock
         self._start_time = time.time()
+
+        # Phase 1 components
+        self._router = router or Router(self._registry)
+
+        # Phase 2 components (optional)
+        self._semantic_cache = semantic_cache
+        self._intermediate_cache = intermediate_cache
+        self._workflow_decomposer = workflow_decomposer
+        self._advanced_router = advanced_router
+        self._task_detector = task_detector
+        self._constraint_interpreter = constraint_interpreter
+
+        # Feature flags (auto-detect from component availability)
+        self._enable_tier2 = (
+            enable_tier2
+            if enable_tier2 is not None
+            else (self._semantic_cache is not None)
+        )
+        self._enable_tier3 = (
+            enable_tier3
+            if enable_tier3 is not None
+            else (
+                self._intermediate_cache is not None
+                and self._workflow_decomposer is not None
+            )
+        )
+
+        # Lazy initialization helpers
+        self._phase2_initialized = False
 
     # ------------------------------------------------------------------
     # Public API
@@ -103,8 +164,15 @@ class InferenceOptimizer:
         quality_threshold: Optional[float] = None,
         cost_budget: Optional[float] = None,
         user_id: Optional[str] = None,
+        routing_mode: RoutingMode = "autopilot",
+        quality_preference: Optional[str] = None,
+        latency_preference: Optional[str] = None,
+        model_override: Optional[str] = None,
+        document_id: Optional[str] = None,
     ) -> InferenceResult:
         """Run a full inference request through the optimization pipeline.
+
+        Supports three-tier caching and advanced routing modes.
 
         Args:
             prompt: The user query.
@@ -113,6 +181,11 @@ class InferenceOptimizer:
             quality_threshold: Minimum quality score (0.0-5.0).
             cost_budget: Optional maximum dollar cost for this request.
             user_id: Optional caller identity.
+            routing_mode: Routing mode: "autopilot", "guided", or "explicit".
+            quality_preference: Quality preference for GUIDED mode ("low", "medium", "high", "max").
+            latency_preference: Latency preference for GUIDED mode ("low", "medium", "high").
+            model_override: Model name for EXPLICIT mode.
+            document_id: Optional document identifier for Tier 3 workflow decomposition.
 
         Returns:
             InferenceResult with response, cost, and metadata.
@@ -135,7 +208,7 @@ class InferenceOptimizer:
                 routing_reason="Error: empty prompt",
             )
 
-        # 1. CACHE CHECK
+        # 1. TIER 1: Exact match cache
         cache_entry = self._check_cache(prompt)
         if cache_entry is not None:
             result = InferenceResult(
@@ -157,19 +230,133 @@ class InferenceOptimizer:
                 output_tokens=0,
                 latency_ms=0,
                 cost=0.0,
-                routing_reason="Cache hit",
+                routing_reason="Cache hit (Tier 1)",
                 task_type=task_id,
                 user_id=user_id,
             )
             return result
 
-        # 2. ROUTE
-        constraints = RoutingConstraints(
-            quality_threshold=quality_threshold,
-            latency_budget_ms=latency_budget_ms,
-            cost_budget=cost_budget,
-        )
-        decision = self._route(constraints)
+        # 2. TIER 2: Semantic similarity cache
+        if self._enable_tier2 and self._semantic_cache is not None:
+            try:
+                detected_task = task_id or self._detect_task_type(prompt)
+                estimated_cost = self._estimate_recompute_cost(
+                    prompt, quality_threshold
+                )
+                # Use "high" cost_sensitivity for more aggressive caching
+                # This lowers the threshold, allowing semantically similar queries to match
+                semantic_result = self._semantic_cache.get(
+                    query=prompt,
+                    task_type=detected_task,
+                    cost_sensitivity="high",  # Changed from "medium" to "high" for more aggressive caching
+                    recompute_cost=estimated_cost,
+                )
+                if semantic_result.hit:
+                    result = InferenceResult(
+                        response=semantic_result.response or "",
+                        model_used="cached",
+                        tokens_input=0,
+                        tokens_output=0,
+                        cost=0.0,
+                        latency_ms=0.0,
+                        cache_hit=True,
+                        routing_reason=(
+                            f"Cache hit (semantic similarity: "
+                            f"{semantic_result.similarity:.2f})"
+                        ),
+                        request_id=request_id,
+                    )
+                    self._log_event(
+                        request_id=request_id,
+                        event_model="cached",
+                        cache_hit=True,
+                        input_tokens=0,
+                        output_tokens=0,
+                        latency_ms=0,
+                        cost=0.0,
+                        routing_reason="Cache hit (Tier 2)",
+                        task_type=detected_task,
+                        user_id=user_id,
+                    )
+                    return result
+            except Exception as exc:
+                logger.warning(
+                    "Tier 2 cache check failed, continuing",
+                    extra={"request_id": request_id, "error": str(exc)},
+                )
+
+        # 3. TIER 3: Intermediate result cache (optional)
+        workflow_steps: Optional[List[WorkflowStep]] = None
+        if self._enable_tier3 and self._workflow_decomposer is not None:
+            try:
+                workflow_steps = self._workflow_decomposer.decompose(
+                    prompt=prompt,
+                    document_id=document_id,
+                    task_type=task_id,
+                )
+                # Check if all steps can be served from intermediate cache
+                if workflow_steps and self._intermediate_cache is not None:
+                    all_hit = True
+                    combined_result_parts = []
+                    for step in workflow_steps:
+                        cached_result = self._intermediate_cache.get(step.cache_key)
+                        if cached_result:
+                            combined_result_parts.append(cached_result)
+                        else:
+                            all_hit = False
+                            break
+
+                    if all_hit and combined_result_parts:
+                        combined_response = " ".join(combined_result_parts)
+                        result = InferenceResult(
+                            response=combined_response,
+                            model_used="cached",
+                            tokens_input=0,
+                            tokens_output=0,
+                            cost=0.0,
+                            latency_ms=0.0,
+                            cache_hit=True,
+                            routing_reason="Cache hit (intermediate results)",
+                            request_id=request_id,
+                        )
+                        self._log_event(
+                            request_id=request_id,
+                            event_model="cached",
+                            cache_hit=True,
+                            input_tokens=0,
+                            output_tokens=0,
+                            latency_ms=0,
+                            cost=0.0,
+                            routing_reason="Cache hit (Tier 3)",
+                            task_type=task_id,
+                            user_id=user_id,
+                        )
+                        return result
+            except Exception as exc:
+                logger.warning(
+                    "Tier 3 cache check failed, continuing",
+                    extra={"request_id": request_id, "error": str(exc)},
+                )
+
+        # 4. ROUTE: Use AdvancedRouter if available, otherwise basic Router
+        if self._advanced_router is not None:
+            decision = self._route_advanced(
+                prompt=prompt,
+                mode=routing_mode,
+                quality_preference=quality_preference,
+                latency_preference=latency_preference,
+                model_override=model_override,
+                quality_threshold=quality_threshold,
+                latency_budget_ms=latency_budget_ms,
+                cost_budget=cost_budget,
+            )
+        else:
+            constraints = RoutingConstraints(
+                quality_threshold=quality_threshold,
+                latency_budget_ms=latency_budget_ms,
+                cost_budget=cost_budget,
+            )
+            decision = self._route(constraints)
 
         # 3. EXECUTE INFERENCE
         start = time.time()
@@ -205,13 +392,53 @@ class InferenceOptimizer:
         model_profile = self._registry.get(decision.model_name)
         cost = calculate_cost(model_profile, actual_input, actual_output)
 
-        # 5. CACHE RESULT
+        # 5. STORE IN ALL CACHE TIERS
+        # Tier 1: Exact match
         self._cache.set(
             query=prompt,
             response=response_text,
             model=decision.model_name,
             cost=cost,
         )
+
+        # Tier 2: Semantic cache
+        if self._enable_tier2 and self._semantic_cache is not None:
+            try:
+                detected_task = task_id or self._detect_task_type(prompt)
+                self._semantic_cache.set(
+                    query=prompt,
+                    response=response_text,
+                    model=decision.model_name,
+                    cost=cost,
+                    task_type=detected_task,
+                )
+            except Exception as exc:
+                logger.warning(
+                    "Failed to store in Tier 2 cache",
+                    extra={"request_id": request_id, "error": str(exc)},
+                )
+
+        # Tier 3: Intermediate cache (if workflow was decomposed)
+        if (
+            self._enable_tier3
+            and workflow_steps
+            and self._intermediate_cache is not None
+        ):
+            try:
+                # Store intermediate results for each step
+                # (In a real implementation, we'd execute the workflow and cache each step)
+                # For now, we'll cache the final result with the step keys
+                for step in workflow_steps:
+                    self._intermediate_cache.set(
+                        cache_key=step.cache_key,
+                        result=response_text,  # Simplified: store full response per step
+                        metadata={"step_type": step.step_type, "step_id": step.step_id},
+                    )
+            except Exception as exc:
+                logger.warning(
+                    "Failed to store in Tier 3 cache",
+                    extra={"request_id": request_id, "error": str(exc)},
+                )
 
         # 6. LOG EVENT
         self._log_event(
@@ -282,8 +509,79 @@ class InferenceOptimizer:
         return self._cache.get(prompt)
 
     def _route(self, constraints: RoutingConstraints) -> RoutingDecision:
-        """Delegate model selection to the router."""
+        """Delegate model selection to the basic router."""
         return self._router.select_model(constraints)
+
+    def _route_advanced(
+        self,
+        prompt: str,
+        mode: RoutingMode,
+        quality_preference: Optional[str],
+        latency_preference: Optional[str],
+        model_override: Optional[str],
+        quality_threshold: Optional[float],
+        latency_budget_ms: Optional[int],
+        cost_budget: Optional[float],
+    ) -> RoutingDecision:
+        """Route using AdvancedRouter and convert to RoutingDecision."""
+        if self._advanced_router is None:
+            # Fallback to basic router
+            constraints = RoutingConstraints(
+                quality_threshold=quality_threshold or 3.5,
+                latency_budget_ms=latency_budget_ms or 300,
+                cost_budget=cost_budget,
+            )
+            return self._router.select_model(constraints)
+
+        advanced_decision = self._advanced_router.route(
+            prompt=prompt,
+            mode=mode,
+            quality_preference=quality_preference,
+            latency_preference=latency_preference,
+            model_override=model_override,
+        )
+
+        # Convert AdvancedRoutingDecision to RoutingDecision
+        return RoutingDecision(
+            model_name=advanced_decision.model_name,
+            reason=advanced_decision.reason,
+            score=advanced_decision.score,
+        )
+
+    def _detect_task_type(self, prompt: str) -> str:
+        """Detect task type from prompt using TaskTypeDetector if available."""
+        if self._task_detector is not None:
+            try:
+                detection = self._task_detector.detect(prompt)
+                return detection.task_type
+            except Exception as exc:
+                logger.warning(
+                    "Task type detection failed",
+                    extra={"error": str(exc)},
+                )
+        return "general"
+
+    def _estimate_recompute_cost(
+        self, prompt: str, quality_threshold: Optional[float]
+    ) -> float:
+        """Estimate the cost of recomputing this inference."""
+        # Use a default model that meets the quality threshold
+        if quality_threshold:
+            candidates = [
+                m
+                for m in self._registry.all()
+                if m.quality_score >= quality_threshold
+            ]
+            if candidates:
+                model = min(candidates, key=lambda m: m.quality_score)
+            else:
+                model = max(self._registry.all(), key=lambda m: m.quality_score)
+        else:
+            model = max(self._registry.all(), key=lambda m: m.quality_score)
+
+        input_tokens = estimate_tokens(prompt)
+        output_tokens = max(20, int(input_tokens * 0.6))  # Estimate output
+        return calculate_cost(model, input_tokens, output_tokens)
 
     def _execute_inference(
         self, model_name: str, prompt: str
