@@ -15,14 +15,7 @@ from src.db.engine import Base
 
 
 class OrgModel(Base):
-    """Organization/tenant for multi-tenancy.
-
-    Attributes:
-        id: Primary key.
-        name: Display name.
-        plan: Subscription plan (e.g. startup, business, enterprise).
-        created_at: Creation timestamp.
-    """
+    """Organization/tenant for multi-tenancy."""
 
     __tablename__ = "orgs"
 
@@ -35,19 +28,7 @@ class OrgModel(Base):
 
 
 class ApiKeyModel(Base):
-    """Stored API key (hash and metadata).
-
-    Attributes:
-        id: Primary key.
-        key_prefix: First 12 chars of key (unique lookup).
-        key_hash: bcrypt hash of full key.
-        user_id: Owner user ID.
-        org_id: FK to orgs (denormalized for fast lookup).
-        scopes: JSON array of scope strings.
-        expires_at: Expiration timestamp.
-        revoked: Whether the key is revoked.
-        created_at: Creation timestamp.
-    """
+    """Stored API key (hash and metadata)."""
 
     __tablename__ = "api_keys"
 
@@ -62,9 +43,3 @@ class ApiKeyModel(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=datetime.utcnow
     )
-
-    # org_id is stored as string (e.g. str(OrgModel.id)); no FK to OrgModel to keep schema simple.
-</think>
-Fixing the ApiKey model: keep `org_id` as a string (no FK) for simplicity.
-<｜tool▁calls▁begin｜><｜tool▁call▁begin｜>
-StrReplace
