@@ -17,7 +17,7 @@ export default function ApiDocsPage() {
   }, []);
   const docsUrl = apiUrl ? `${apiUrl.replace(/\/$/, "")}/docs` : "";
   return (
-    <div className="min-h-screen bg-black text-white">
+    <div className="min-h-screen bg-acron-black text-white">
       <Navbar />
       <main className="pt-24 px-6 pb-12 max-w-4xl mx-auto">
         <h1 className="text-2xl font-bold text-white mb-4">API Docs</h1>

@@ -17,7 +17,7 @@ export function Toggle({
         aria-checked={enabled}
         onClick={() => onChange(!enabled)}
         className={`relative inline-flex h-8 w-14 items-center rounded-full transition ${
-          enabled ? "bg-asahi-orange" : "bg-neutral-border"
+          enabled ? "bg-acron-primary_accent" : "bg-neutral-border"
         }`}
       >
         <span

@@ -16,7 +16,7 @@ import {
   Legend,
 } from "recharts";
 
-const ACRON_PRIMARY = "#FF6B35";
+const ACRON_PRIMARY = "#D97B4A";
 
 export default function CachePage() {
   const [metrics, setMetrics] = useState<Record<string, unknown> | null>(null);

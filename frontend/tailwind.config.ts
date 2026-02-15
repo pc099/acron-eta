@@ -10,25 +10,21 @@ const config: Config = {
     extend: {
       colors: {
         acron: {
-          primary: "#FFFFFF", // White for primary accents in a black theme? or maybe a specific brand color. Let's stick to standard dark mode patterns.
-          // User asked for "black as background".
-          // Let's define a 'black' palette or just use neutral.
-          // But replacing 'asahi' structure:
-          black: "#000000",
-          dark: "#0A0A0A",
+          primary: "#FFFFFF",
+          black: "#0f0f0f",
+          dark: "#141414",
           light: "#FFFFFF",
-          gray: "#333333",
-          primary_accent: "#FF6B35", // Keeping the orange as an accent for now unless specified otherwise, or maybe the user wants purely black/white.
-          // "check the above image for sing in i need the singn in and sign up pages to be in the same way"
-          // The image usually implies a clean dark mode.
+          gray: "#2a2a2a",
+          primary_accent: "#D97B4A", // Soothing orange, not too bright
         },
+        "asahi-orange": "#D97B4A",
+        "asahi-orange-very-light": "rgba(217,123,74,0.15)",
         neutral: {
-          dark: "#050505", // Deep black/gray
-          "dark-gray": "#9CA3AF", // Lighter gray for text
-          "light-gray": "#1F2937", // Dark gray for containers
-          border: "#374151",
-          white: "#000000", // Inverting for dark mode? No, better to stick to semantic names.
-          // Let's redefine neutral to be dark-mode friendly defaults
+          dark: "#141414",
+          "dark-gray": "#9CA3AF",
+          "light-gray": "#1e1e1e",
+          border: "#2d2d2d",
+          white: "#141414",
         },
         semantic: {
           success: "#4CAF50",

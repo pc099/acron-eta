@@ -23,8 +23,8 @@ import {
   Legend,
 } from "recharts";
 
-const ACRON_PRIMARY = "#FF6B35"; // Keeping accent color for charts
-const ORANGE = "#FF6B35"; // This constant is still used for pie chart, keeping it for now.
+const ACRON_PRIMARY = "#D97B4A";
+const ORANGE = "#D97B4A";
 
 export default function DashboardPage() {
   const [metrics, setMetrics] = useState<Record<string, unknown> | null>(null);

@@ -10,7 +10,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.db.engine import get_async_session
 from src.db.models import ApiKeyModel, OrgModel, UserModel
-from src.db.repositories import ApiKeyRepository, OrgRepository
 
 auth_router = APIRouter(prefix="/auth", tags=["Auth"])
 
@@ -74,21 +73,11 @@ async def signup(
     session.add(user)
     await session.flush() # to get user.id
 
-    # Generate API Key
-    # Using existing logic from ApiKeyRepository or replicate it here for simplicity
-    # Repository usually handles hashing. Let's use the repository if possible, or just create manual model.
-    # We need a raw key to return to user.
+    # Generate API key (bcrypt hash so AuthMiddleware.validate_api_key can verify it)
     raw_key = f"acron_{secrets.token_urlsafe(32)}"
-    key_hash = ApiKeyRepository.hash_key(raw_key) # Assuming static method or we need to instantiate
-    # Wait, ApiKeyRepository might not have a static hash_key. Let's check repositories.py content later.
-    # For now, I'll assume standard hashing mechanism or just use a simple one if repo is instance based.
-    # I'll implement a local helper for key hashing if needed or peek at repositories.py again.
-    # Looking at step 57 view_file repositories.py: it didn't show hash_key method in snippets.
-    # I will stick to what I know: ApiKeyModel needs key_hash.
-    # I'll use sha256 for key hash.
-
-    import hashlib
-    key_hash = hashlib.sha256(raw_key.encode()).hexdigest()
+    key_hash = bcrypt.hashpw(
+        raw_key.encode("utf-8"), bcrypt.gensalt()
+    ).decode("utf-8")
 
     api_key = ApiKeyModel(
         key_prefix=raw_key[:12],
@@ -124,12 +113,11 @@ async def login(
             detail="Incorrect email or password",
         )
 
-    # Generate a short-lived API Key for this session
+    # Generate a short-lived API key (bcrypt hash so AuthMiddleware can verify it)
     raw_key = f"acron_sess_{secrets.token_urlsafe(32)}"
-    
-    # Simple SHA256 hash for storage
-    import hashlib
-    key_hash = hashlib.sha256(raw_key.encode()).hexdigest()
+    key_hash = bcrypt.hashpw(
+        raw_key.encode("utf-8"), bcrypt.gensalt()
+    ).decode("utf-8")
 
     api_key_entry = ApiKeyModel(
         key_prefix=raw_key[:12],

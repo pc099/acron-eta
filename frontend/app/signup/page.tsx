@@ -40,12 +40,9 @@ export default function SignupPage() {
   }
 
   return (
-    <div className="min-h-screen bg-black flex flex-col items-center justify-center p-6">
+    <div className="min-h-screen bg-acron-black flex flex-col items-center justify-center p-6">
       <Link href="/" className="mb-8 flex items-center gap-2">
-         {/* Simple Logo Placeholder */}
-         <div className="w-8 h-8 rounded bg-white flex items-center justify-center">
-            <span className="text-black font-bold text-xs">A</span>
-          </div>
+        <img src="/logo.svg" alt="ACRON" className="w-8 h-8 rounded object-contain" />
         <span className="text-2xl font-bold text-white tracking-wide">ACRON</span>
       </Link>
 
@@ -61,7 +58,7 @@ export default function SignupPage() {
             placeholder="John Doe"
             value={fullName}
             onChange={(e) => setFullName(e.target.value)}
-            className="bg-black border-neutral-border text-white placeholder-neutral-dark-gray focus:border-acron-primary_accent"
+            className="bg-neutral-dark border-neutral-border text-white placeholder-neutral-dark-gray focus:border-acron-primary_accent"
           />
           <Input
             label="Email"
@@ -70,7 +67,7 @@ export default function SignupPage() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
-            className="bg-black border-neutral-border text-white placeholder-neutral-dark-gray focus:border-acron-primary_accent"
+            className="bg-neutral-dark border-neutral-border text-white placeholder-neutral-dark-gray focus:border-acron-primary_accent"
           />
           <Input
             label="Password"
@@ -79,14 +76,14 @@ export default function SignupPage() {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
-            className="bg-black border-neutral-border text-white placeholder-neutral-dark-gray focus:border-acron-primary_accent"
+            className="bg-neutral-dark border-neutral-border text-white placeholder-neutral-dark-gray focus:border-acron-primary_accent"
           />
           <Input
             label="Organization Name (Optional)"
             placeholder="Acme Corp"
             value={orgName}
             onChange={(e) => setOrgName(e.target.value)}
-            className="bg-black border-neutral-border text-white placeholder-neutral-dark-gray focus:border-acron-primary_accent"
+            className="bg-neutral-dark border-neutral-border text-white placeholder-neutral-dark-gray focus:border-acron-primary_accent"
           />
 
           {error && (

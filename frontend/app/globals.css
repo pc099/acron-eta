@@ -5,21 +5,23 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
 :root {
+  /* Matt black finish – soft dark grays instead of pure black */
   --acron-primary: #FFFFFF;
-  --acron-black: #000000;
-  --acron-dark: #0A0A0A;
+  --acron-black: #0f0f0f;
+  --acron-dark: #141414;
   --acron-light: #FFFFFF;
-  --acron-gray: #333333;
-  --acron-primary-accent: #FF6B35;
-  --neutral-dark: #050505;
+  --acron-gray: #2a2a2a;
+  /* Soothing orange – muted, not too bright */
+  --acron-primary-accent: #D97B4A;
+  --neutral-dark: #141414;
   --neutral-dark-gray: #9CA3AF;
-  --neutral-light-gray: #1F2937;
-  --neutral-border: #374151;
-  --footer-bg: #000000;
+  --neutral-light-gray: #1e1e1e;
+  --neutral-border: #2d2d2d;
+  --footer-bg: #0f0f0f;
 }
 
 body {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
   color: #FFFFFF;
-  background-color: #000000;
+  background-color: #0f0f0f;
 }

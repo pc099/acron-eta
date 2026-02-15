@@ -8,7 +8,7 @@ import { MetricCard } from "@/components/MetricCard";
 
 export default function LandingPage() {
   return (
-    <div className="bg-black text-white min-h-screen">
+    <div className="bg-acron-black text-white min-h-screen">
       <Navbar />
 
       {/* Hero */}
@@ -32,9 +32,9 @@ export default function LandingPage() {
                   Start Building
                 </Button>
               </Link>
-              <Link href="/dashboard">
+              <Link href="/getting-started">
                 <Button variant="outline" size="lg">
-                  Get Demo
+                  Get Started
                 </Button>
               </Link>
             </div>
@@ -82,7 +82,7 @@ export default function LandingPage() {
       </section>
 
       {/* Metrics - Production Results */}
-      <section id="metrics" className="py-20 bg-black px-6">
+      <section id="metrics" className="py-20 bg-acron-black px-6">
         <div className="max-w-7xl mx-auto">
           <h2 className="text-3xl md:text-4xl font-bold text-center text-white mb-12">
             Production Results
@@ -101,7 +101,7 @@ export default function LandingPage() {
 
       {/* CTA */}
       <section className="py-20 bg-acron-primary_accent px-6 relative overflow-hidden">
-        <div className="absolute inset-0 bg-black/10"></div>
+        <div className="absolute inset-0 bg-acron-black/10"></div>
         <div className="max-w-4xl mx-auto text-center text-white relative z-10">
           <h2 className="text-3xl md:text-4xl font-bold mb-6">
             Ready to optimize your LLM inference?

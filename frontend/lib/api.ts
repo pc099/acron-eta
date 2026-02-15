@@ -80,8 +80,7 @@ export async function getMetrics() {
 }
 
 export async function getCostSummary(period: string = "24h") {
-  // Assuming backend has this endpoint or similar, adjusting based on usage
-  return fetchApi(`/analytics/cost-breakdown?period=${period}`);
+  return fetchApi(`/analytics/cost-summary?period=${period}`);
 }
 
 export async function getRecentInferences(limit: number = 50) {

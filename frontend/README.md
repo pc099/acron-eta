@@ -1,6 +1,6 @@
-# Asahi Dashboard (Frontend)
+# ACRON Dashboard (Frontend)
 
-Next.js dashboard for the Asahi inference cost optimizer. Matches the [wireframes](docs/ASAHI_FRONTEND_WIREFRAMES.md) and [design system](docs/ASAHI_FRONTEND_DESIGN_SYSTEM.md).
+Next.js dashboard for the ACRON inference cost optimizer.
 
 ## Setup
 
@@ -38,4 +38,4 @@ Set **Root Directory** to `frontend` and add env var `NEXT_PUBLIC_API_URL` to yo
 - **/analytics** – Cost breakdown, trends, insights
 - **/settings** – API URL and API key
 
-Design: Asahi orange (#FF6B35), Inter font, 8px spacing grid.
+Design: ACRON soothing orange (#D97B4A), Inter font, matt black background (#0f0f0f).
