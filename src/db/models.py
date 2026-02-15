@@ -7,9 +7,9 @@ Used for persistence when DATABASE_URL is set (e.g. Railway Postgres).
 from datetime import datetime
 from typing import Any, List, Optional
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, DateTime, Integer, String
 from sqlalchemy.dialects.postgresql import JSONB
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column
 
 from src.db.engine import Base
 
@@ -31,10 +31,6 @@ class OrgModel(Base):
     plan: Mapped[str] = mapped_column(String(64), nullable=False, default="startup")
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=datetime.utcnow
-    )
-
-    api_keys: Mapped[List["ApiKeyModel"]] = relationship(
-        "ApiKeyModel", back_populates="org", cascade="all, delete-orphan"
     )
 
 
@@ -67,18 +63,7 @@ class ApiKeyModel(Base):
         DateTime(timezone=True), nullable=False, default=datetime.utcnow
     )
 
-    org: Mapped[Optional["OrgModel"]] = relationship(
-        "OrgModel", back_populates="api_keys", foreign_keys=[org_id]
-    )
-
-
-# Fix relationship: ApiKeyModel.org_id should reference OrgModel.id if we use FK.
-# For minimal schema we keep org_id as string (external id) so we don't require
-# orgs to exist before keys. Remove the foreign_keys if we're not using FK.
-# Actually the roadmap had org_id as VARCHAR, so we store org_id as string (e.g. uuid or slug).
-# So no FK from api_keys to orgs; we just have both tables. Remove the relationship
-# from ApiKeyModel to OrgModel to avoid needing org_id as integer FK.
-# I'll remove the relationship from ApiKeyModel to OrgModel and keep org_id as string.
+    # org_id is stored as string (e.g. str(OrgModel.id)); no FK to OrgModel to keep schema simple.
 </think>
 Fixing the ApiKey model: keep `org_id` as a string (no FK) for simplicity.
 <｜tool▁calls▁begin｜><｜tool▁call▁begin｜>
