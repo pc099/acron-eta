@@ -477,3 +477,29 @@ class GovernanceEngine:
         with self._lock:
             timestamps = self._request_log.get(org_id, [])
             return sum(1 for ts in timestamps if ts >= cutoff)
+
+    def get_usage(
+        self,
+        org_id: str,
+        period_hours: int = 24,
+    ) -> Tuple[int, float]:
+        """Return request count and total cost for an org over the last N hours.
+
+        Args:
+            org_id: Organisation ID.
+            period_hours: Rolling window in hours (e.g. 24 for day, 720 for month).
+
+        Returns:
+            Tuple of (request_count, total_cost_usd).
+        """
+        cutoff = datetime.utcnow() - timedelta(hours=period_hours)
+        with self._lock:
+            requests = sum(
+                1 for ts in self._request_log.get(org_id, []) if ts >= cutoff
+            )
+            cost = sum(
+                c
+                for ts, c in self._spend_log.get(org_id, [])
+                if ts >= cutoff
+            )
+        return requests, round(cost, 4)

@@ -1,0 +1,22 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+:root {
+  --asahi-orange: #FF6B35;
+  --asahi-orange-light: #FFB84D;
+  --asahi-orange-very-light: #FFF3E0;
+  --neutral-dark: #1A1A1A;
+  --neutral-dark-gray: #4A4A4A;
+  --neutral-light-gray: #F5F5F5;
+  --neutral-border: #E0E0E0;
+  --footer-bg: #1A1A1A;
+}
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  color: var(--neutral-dark);
+  background-color: #FFFFFF;
+}

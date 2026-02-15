@@ -13,12 +13,13 @@ from typing import Any, Callable, Dict, List, Optional
 
 from src.batching.engine import BatchConfig
 from src.batching.queue import QueuedRequest, RequestQueue
+from src.core.optimizer import InferenceResult
 from src.exceptions import BatchingError
 
 logger = logging.getLogger(__name__)
 
-# Type alias for the executor callback
-BatchExecutor = Callable[[List[QueuedRequest]], List[str]]
+# Executor receives a batch and returns one InferenceResult per request
+BatchExecutor = Callable[[List[QueuedRequest]], List[InferenceResult]]
 
 
 class BatchScheduler:
@@ -37,7 +38,7 @@ class BatchScheduler:
     Args:
         queue: The shared request queue to monitor.
         executor: Callback that receives a list of requests and returns
-            a list of response strings (one per request).
+            a list of InferenceResult (one per request).
         config: Batch configuration (shared with :class:`BatchEngine`).
         poll_interval_ms: How often the scheduler checks the queue.
     """
@@ -272,31 +273,27 @@ class BatchScheduler:
     def _resolve_futures(
         self,
         batch: List[QueuedRequest],
-        results: List[str],
+        results: List[InferenceResult],
     ) -> None:
         """Resolve each request's future with its corresponding result.
 
         If the results list is shorter than the batch, remaining futures
-        are resolved with an error string.
+        get an exception.
 
         Args:
             batch: The batch of requests.
-            results: Response strings from the executor.
+            results: InferenceResult per request from the executor.
         """
         for idx, req in enumerate(batch):
             if req.future is not None and not req.future.done():
                 if idx < len(results):
                     try:
-                        req.future.get_loop().call_soon_threadsafe(
-                            req.future.set_result, results[idx]
-                        )
+                        req.future.set_result(results[idx])
                     except Exception:
-                        # If the loop is closed or future already resolved
                         pass
                 else:
                     try:
-                        req.future.get_loop().call_soon_threadsafe(
-                            req.future.set_exception,
+                        req.future.set_exception(
                             BatchingError("No result returned for request"),
                         )
                     except Exception:
@@ -313,9 +310,7 @@ class BatchScheduler:
                 results = self._executor([req])
                 if req.future is not None and not req.future.done():
                     try:
-                        req.future.get_loop().call_soon_threadsafe(
-                            req.future.set_result, results[0]
-                        )
+                        req.future.set_result(results[0])
                     except Exception:
                         pass
                 self._individual_fallbacks += 1
@@ -331,8 +326,7 @@ class BatchScheduler:
                 )
                 if req.future is not None and not req.future.done():
                     try:
-                        req.future.get_loop().call_soon_threadsafe(
-                            req.future.set_exception,
+                        req.future.set_exception(
                             BatchingError(f"All execution paths failed: {exc}"),
                         )
                     except Exception:
@@ -349,9 +343,7 @@ class BatchScheduler:
                         results = self._executor([req])
                         if req.future is not None and not req.future.done():
                             try:
-                                req.future.get_loop().call_soon_threadsafe(
-                                    req.future.set_result, results[0]
-                                )
+                                req.future.set_result(results[0])
                             except Exception:
                                 pass
                         self._requests_processed += 1

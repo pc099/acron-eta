@@ -2,7 +2,7 @@
 
 > **Purpose:** Complete context for continuing development after Step 1 and Step 2 integration  
 > **Last Updated:** 2026-02-13  
-> **Status:** Step 1 Complete ✅ | Step 2 Complete ✅ | Ready for Step 3
+> **Status:** Steps 1–7 Complete ✅ | Production path: **Option A (Python-first)** per `docs/PRODUCTION_ROADMAP_DETAILED.md`
 
 ---
 
@@ -40,10 +40,11 @@
 
 ### Current State
 
-- **Phase 1:** Fully integrated and working (Tier 1 cache, basic routing)
-- **Phase 2:** Fully integrated and working (Tier 2/3 cache, AdvancedRouter)
-- **Phase 3-7:** Components exist but NOT integrated into main pipeline
-- **Infrastructure:** In-memory only (no PostgreSQL, Redis, Pinecone persistence)
+- **Phase 1:** Fully integrated (Tier 1 cache, basic routing, Redis/Postgres/Docker, OpenAI compat, auth)
+- **Phase 2:** Fully integrated (Tier 2/3 cache, AdvancedRouter, TokenOptimizer, FeatureEnricher, batching)
+- **Steps 3–6:** Token optimization, feature store, batching, auth/governance (RBAC, policy/budget, audit) wired
+- **Step 7 / Infrastructure:** PostgreSQL (API keys, orgs), Redis (Tier 1), Pinecone (Tier 2 when `PINECONE_*` set)
+- **Production roadmap:** See `docs/PRODUCTION_ROADMAP_DETAILED.md`; we follow **Option A (Python-first)**.
 
 ### Key Metrics
 
@@ -1044,6 +1045,7 @@ python test_phase2.py
 - `docs/LOCAL_TESTING_GUIDE.md` - How to test locally
 - `docs/PHASE2_IMPLEMENTATION.md` - Phase 2 component details
 - `docs/PRODUCTION_ROADMAP.md` - Production deployment guide
+- `docs/PRODUCTION_ROADMAP_DETAILED.md` - **Detailed production roadmap** (summarizes TensorZero, Frontend/Backend, GTM docs; phased plan to first customers and optional TensorZero hybrid)
 
 ### 18.2 Test Files
 
@@ -1074,13 +1076,18 @@ python test_phase2.py
   - [x] Threshold adjustments
   - [x] Cost sensitivity optimization
 
-### ⏳ Next Steps
+### ⏳ Next Steps (from production roadmap)
 
-- [ ] Step 3: Token optimization integration
-- [ ] Step 4: Feature store integration
-- [ ] Step 5: Batching integration
-- [ ] Step 6: Auth and governance wiring
-- [ ] Step 7: Infrastructure (PostgreSQL, Redis, Pinecone)
+- [x] Step 3: Token optimization integration
+- [x] Step 4: Feature store integration
+- [x] Step 5: Batching integration
+- [x] Step 6: Auth and governance wiring
+- [x] Step 7: Infrastructure (PostgreSQL, Redis, Pinecone)
+- [ ] Phase 3.1: Pricing/plans, per-org usage tracking, billing API
+- [ ] Phase 3.2: Self-serve signup, welcome email
+- [ ] Phase 3.3: Integration guide, Quick start, ROI/pricing docs
+- [ ] Phase 1.2: Async + connection pooling, load test
+- [ ] Phase 2.4: Prometheus scrape doc, structured logging
 
 ### 📝 Documentation
 
@@ -1102,13 +1109,13 @@ This handoff document captures the complete state of the Asahi project after Ste
 5. All tests pass, no regressions introduced
 
 **When continuing development:**
-1. Read `docs/INTEGRATION_ROADMAP.md` for next steps
+1. Read `docs/PRODUCTION_ROADMAP_DETAILED.md` for the unified plan and `docs/INTEGRATION_ROADMAP.md` for step details
 2. Follow existing patterns (graceful degradation, dependency injection)
 3. Test thoroughly before marking complete
 4. Update this handoff document with new changes
 
 ---
 
-**Document Version:** 1.0  
+**Document Version:** 1.1  
 **Last Updated:** 2026-02-13  
-**Status:** Ready for Step 3
+**Status:** Steps 1–7 complete; Option A (Python-first) production path. See production roadmap for Phase 3–4 (pricing, onboarding, docs).

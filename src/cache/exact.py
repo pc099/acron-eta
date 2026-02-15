@@ -78,18 +78,20 @@ class Cache:
         self._misses: int = 0
         self._total_cost_saved: float = 0.0
 
-    def generate_key(self, query: str) -> str:
+    def generate_key(self, query: str, org_id: Optional[str] = None) -> str:
         """Generate a deterministic MD5 cache key from a query string.
 
         Args:
             query: The user query to hash.
+            org_id: Optional org/tenant ID for cache isolation.
 
         Returns:
-            Hex-encoded MD5 digest.
+            Hex-encoded MD5 digest, optionally prefixed with org_id.
         """
-        return hashlib.md5(query.encode("utf-8")).hexdigest()
+        digest = hashlib.md5(query.encode("utf-8")).hexdigest()
+        return f"{org_id}:{digest}" if org_id else digest
 
-    def get(self, query: str) -> Optional[CacheEntry]:
+    def get(self, query: str, org_id: Optional[str] = None) -> Optional[CacheEntry]:
         """Look up a cached response by query.
 
         If the entry exists but has expired, it is deleted and counted
@@ -97,11 +99,12 @@ class Cache:
 
         Args:
             query: The user query to look up.
+            org_id: Optional org/tenant ID for cache isolation.
 
         Returns:
             The CacheEntry on a hit, or ``None`` on a miss.
         """
-        key = self.generate_key(query)
+        key = self.generate_key(query, org_id)
         entry = self._store.get(key)
 
         if entry is None:
@@ -136,6 +139,7 @@ class Cache:
         response: str,
         model: str,
         cost: float,
+        org_id: Optional[str] = None,
     ) -> CacheEntry:
         """Store a new cache entry.
 
@@ -144,6 +148,7 @@ class Cache:
             response: The response text to cache.
             model: The model that produced the response.
             cost: Dollar cost of the original inference call.
+            org_id: Optional org/tenant ID for cache isolation.
 
         Returns:
             The newly created CacheEntry.
@@ -154,7 +159,7 @@ class Cache:
         if not query or not query.strip():
             raise ValueError("Query must not be empty")
 
-        key = self.generate_key(query)
+        key = self.generate_key(query, org_id)
         now = datetime.now(timezone.utc)
 
         if key in self._store:
@@ -181,16 +186,17 @@ class Cache:
         logger.debug("Cache set", extra={"cache_key": key})
         return entry
 
-    def invalidate(self, query: str) -> bool:
+    def invalidate(self, query: str, org_id: Optional[str] = None) -> bool:
         """Remove a cache entry by query.
 
         Args:
             query: The query whose entry should be removed.
+            org_id: Optional org/tenant ID for cache isolation.
 
         Returns:
             ``True`` if an entry was removed, ``False`` otherwise.
         """
-        key = self.generate_key(query)
+        key = self.generate_key(query, org_id)
         if key in self._store:
             del self._store[key]
             logger.info("Cache entry invalidated", extra={"cache_key": key})

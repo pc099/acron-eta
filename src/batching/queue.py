@@ -6,12 +6,12 @@ protected by a ``threading.Lock`` so the queue is safe for concurrent
 producers (API handlers) and a single consumer (the batch scheduler).
 """
 
-import asyncio
 import logging
 import threading
 from collections import defaultdict
-from datetime import datetime, timezone
-from typing import Dict, List, Optional
+from concurrent.futures import Future
+from datetime import datetime, timedelta, timezone
+from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -28,8 +28,8 @@ class QueuedRequest(BaseModel):
         batch_group: Key that groups compatible requests (e.g. ``"faq:sonnet"``).
         enqueued_at: UTC timestamp when the request entered the queue.
         deadline: UTC timestamp by which this request must be dispatched.
-        future: An ``asyncio.Future`` resolved when the batch completes.
-            Excluded from Pydantic serialisation.
+        future: Resolved with InferenceResult when the batch completes (thread-safe).
+        infer_kwargs: Arguments to pass to optimizer.infer() when executing this request.
     """
 
     request_id: str
@@ -38,7 +38,8 @@ class QueuedRequest(BaseModel):
     batch_group: str
     enqueued_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     deadline: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    future: Optional[asyncio.Future] = Field(default=None, exclude=True)
+    future: Optional[Future] = Field(default=None, exclude=True)
+    infer_kwargs: Dict[str, Any] = Field(default_factory=dict)
 
     model_config = {"arbitrary_types_allowed": True}
 

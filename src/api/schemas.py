@@ -44,6 +44,9 @@ class InferRequest(BaseModel):
     user_id: Optional[str] = Field(
         default=None, description="Caller identity"
     )
+    organization_id: Optional[str] = Field(
+        default=None, description="Organisation ID for feature enrichment"
+    )
     routing_mode: RoutingMode = Field(
         default="autopilot", description="Routing mode"
     )
@@ -73,7 +76,11 @@ class InferResponse(BaseModel):
         cost: Dollar cost for this request.
         latency_ms: End-to-end latency in milliseconds.
         cache_hit: Whether the result came from cache.
+        cache_tier: Cache tier that served the result (1, 2, 3) or 0 for miss.
         routing_reason: Explanation of model choice.
+        cost_original: Baseline cost before optimization (optional, for dashboard).
+        cost_savings_percent: Percent saved vs baseline (optional, for dashboard).
+        optimization_techniques: List of techniques applied (optional).
     """
 
     request_id: str
@@ -84,7 +91,26 @@ class InferResponse(BaseModel):
     cost: float = 0.0
     latency_ms: float = 0.0
     cache_hit: bool = False
+    cache_tier: int = Field(
+        default=0,
+        ge=0,
+        le=3,
+        description="Cache tier that served (1/2/3) or 0 for miss",
+    )
     routing_reason: str = ""
+    cost_original: Optional[float] = Field(
+        default=None,
+        ge=0.0,
+        description="Baseline cost before optimization (dashboard)",
+    )
+    cost_savings_percent: Optional[float] = Field(
+        default=None,
+        description="Percent saved vs baseline (dashboard)",
+    )
+    optimization_techniques: Optional[List[str]] = Field(
+        default=None,
+        description="Techniques applied (e.g. cache_tier_1, semantic_cache)",
+    )
 
 
 class HealthResponse(BaseModel):
@@ -168,3 +194,74 @@ class AnalyticsResponse(BaseModel):
     """
 
     data: Any
+
+
+# ---------------------------------------------------------------------------
+# OpenAI-compatible API (Phase 1 production)
+# ---------------------------------------------------------------------------
+
+
+class OpenAIChatMessage(BaseModel):
+    """Single message in OpenAI chat format.
+
+    Attributes:
+        role: 'system', 'user', or 'assistant'.
+        content: Message text.
+    """
+
+    role: Literal["system", "user", "assistant"]
+    content: str = ""
+
+
+class OpenAIChatRequest(BaseModel):
+    """OpenAI-compatible chat completions request.
+
+    Attributes:
+        messages: Conversation history.
+        model: Model ID (passed as model_override to Asahi).
+        max_tokens: Maximum completion tokens.
+        temperature: Sampling temperature (optional).
+        stream: Whether to stream (Asahi may ignore for MVP).
+    """
+
+    messages: List[OpenAIChatMessage] = Field(
+        ...,
+        min_length=1,
+        description="Conversation messages",
+    )
+    model: Optional[str] = Field(default=None, description="Model ID override")
+    max_tokens: Optional[int] = Field(default=1024, ge=1, le=128000)
+    temperature: Optional[float] = Field(default=1.0, ge=0.0, le=2.0)
+    stream: Optional[bool] = Field(default=False)
+
+
+class OpenAIChatChoice(BaseModel):
+    """Single choice in OpenAI response."""
+
+    index: int = 0
+    message: OpenAIChatMessage
+    finish_reason: Literal["stop", "length", "content_filter"] = "stop"
+
+
+class OpenAIUsage(BaseModel):
+    """Token usage in OpenAI format."""
+
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
+    total_tokens: int = 0
+
+
+class OpenAIChatResponse(BaseModel):
+    """OpenAI-compatible chat completions response.
+
+    Attributes:
+        id: Response ID (request_id).
+        choices: List of completion choices.
+        usage: Token usage.
+        model: Model used.
+    """
+
+    id: str = ""
+    choices: List[OpenAIChatChoice] = Field(default_factory=list)
+    usage: OpenAIUsage = Field(default_factory=OpenAIUsage)
+    model: str = ""

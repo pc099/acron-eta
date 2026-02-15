@@ -1,6 +1,7 @@
 """Tests for BatchScheduler -- background batch execution."""
 
 import time
+from concurrent.futures import Future
 from datetime import datetime, timedelta, timezone
 from typing import List
 from unittest.mock import MagicMock, patch
@@ -10,7 +11,17 @@ import pytest
 from src.batching.engine import BatchConfig
 from src.batching.queue import QueuedRequest, RequestQueue
 from src.batching.scheduler import BatchScheduler
+from src.core.optimizer import InferenceResult
 from src.exceptions import BatchingError
+
+
+def _make_result(request_id: str) -> InferenceResult:
+    """Minimal InferenceResult for tests."""
+    return InferenceResult(
+        response=f"response-{request_id}",
+        model_used="test-model",
+        request_id=request_id,
+    )
 
 
 def _make_request(
@@ -48,13 +59,13 @@ def _make_expired_request(
     )
 
 
-def _success_executor(batch: List[QueuedRequest]) -> List[str]:
-    """Simple executor that returns a response per request."""
-    return [f"response-{req.request_id}" for req in batch]
+def _success_executor(batch: List[QueuedRequest]) -> List[InferenceResult]:
+    """Simple executor that returns an InferenceResult per request."""
+    return [_make_result(req.request_id) for req in batch]
 
 
-def _failing_executor(batch: List[QueuedRequest]) -> List[str]:
-    """Executor that always raises."""
+def _failing_executor(batch: List[QueuedRequest]) -> List[InferenceResult]:
+    """Executor that always raises (return type for type checker)."""
     raise RuntimeError("API call failed")
 
 
@@ -135,7 +146,7 @@ class TestBatchSchedulerExecution:
         """flush_group should execute immediately without the loop running."""
         executed: List[List[QueuedRequest]] = []
 
-        def tracking_executor(batch: List[QueuedRequest]) -> List[str]:
+        def tracking_executor(batch: List[QueuedRequest]) -> List[InferenceResult]:
             executed.append(batch)
             return _success_executor(batch)
 
@@ -156,7 +167,7 @@ class TestBatchSchedulerExecution:
         """When group reaches max_batch_size, scheduler flushes."""
         executed: List[List[QueuedRequest]] = []
 
-        def tracking_executor(batch: List[QueuedRequest]) -> List[str]:
+        def tracking_executor(batch: List[QueuedRequest]) -> List[InferenceResult]:
             executed.append(batch)
             return _success_executor(batch)
 
@@ -185,7 +196,7 @@ class TestBatchSchedulerExecution:
         """Expired deadlines should force a flush even below min_batch_size."""
         executed: List[List[QueuedRequest]] = []
 
-        def tracking_executor(batch: List[QueuedRequest]) -> List[str]:
+        def tracking_executor(batch: List[QueuedRequest]) -> List[InferenceResult]:
             executed.append(batch)
             return _success_executor(batch)
 
@@ -211,7 +222,7 @@ class TestBatchSchedulerExecution:
         """Group with min_batch_size and oldest age > 70% of max_wait flushes."""
         executed: List[List[QueuedRequest]] = []
 
-        def tracking_executor(batch: List[QueuedRequest]) -> List[str]:
+        def tracking_executor(batch: List[QueuedRequest]) -> List[InferenceResult]:
             executed.append(batch)
             return _success_executor(batch)
 
@@ -276,12 +287,12 @@ class TestBatchSchedulerErrorHandling:
         """When batch execution fails, each request is retried individually."""
         call_count = 0
 
-        def mixed_executor(batch: List[QueuedRequest]) -> List[str]:
+        def mixed_executor(batch: List[QueuedRequest]) -> List[InferenceResult]:
             nonlocal call_count
             call_count += 1
             if call_count == 1 and len(batch) > 1:
                 raise RuntimeError("Batch API failed")
-            return [f"result-{r.request_id}" for r in batch]
+            return [_make_result(r.request_id) for r in batch]
 
         scheduler = BatchScheduler(
             queue=queue, executor=mixed_executor, config=config
@@ -317,10 +328,10 @@ class TestBatchSchedulerErrorHandling:
         """stop() should drain remaining requests individually."""
         executed_ids: List[str] = []
 
-        def tracking_executor(batch: List[QueuedRequest]) -> List[str]:
+        def tracking_executor(batch: List[QueuedRequest]) -> List[InferenceResult]:
             for req in batch:
                 executed_ids.append(req.request_id)
-            return [f"result-{r.request_id}" for r in batch]
+            return [_make_result(r.request_id) for r in batch]
 
         scheduler = BatchScheduler(
             queue=queue,
@@ -346,14 +357,14 @@ class TestBatchSchedulerErrorHandling:
         group_a_results: List[str] = []
         call_count = 0
 
-        def selective_executor(batch: List[QueuedRequest]) -> List[str]:
+        def selective_executor(batch: List[QueuedRequest]) -> List[InferenceResult]:
             nonlocal call_count
             call_count += 1
             group = batch[0].batch_group if batch else ""
             if group == "bad:group":
                 raise RuntimeError("This group always fails")
-            results = [f"ok-{r.request_id}" for r in batch]
-            group_a_results.extend(results)
+            results = [_make_result(r.request_id) for r in batch]
+            group_a_results.extend(r.response for r in results)
             return results
 
         scheduler = BatchScheduler(
@@ -406,10 +417,10 @@ class TestBatchSchedulerEdgeCases:
         """If the loop crashes, remaining requests should be drained."""
         call_count = 0
 
-        def crashing_executor(batch: List[QueuedRequest]) -> List[str]:
+        def crashing_executor(batch: List[QueuedRequest]) -> List[InferenceResult]:
             nonlocal call_count
             call_count += 1
-            return [f"result-{r.request_id}" for r in batch]
+            return [_make_result(r.request_id) for r in batch]
 
         scheduler = BatchScheduler(
             queue=queue,
@@ -439,25 +450,21 @@ class TestBatchSchedulerEdgeCases:
         self, queue: RequestQueue, config: BatchConfig
     ) -> None:
         """_resolve_futures handles results list shorter than batch."""
-        import asyncio
+        scheduler = BatchScheduler(
+            queue=queue, executor=_success_executor, config=config
+        )
 
-        loop = asyncio.new_event_loop()
+        reqs = []
+        for i in range(3):
+            req = _make_request(f"r{i}")
+            req.future = Future()
+            reqs.append(req)
 
-        try:
-            scheduler = BatchScheduler(
-                queue=queue, executor=_success_executor, config=config
-            )
-
-            reqs = []
-            for i in range(3):
-                req = _make_request(f"r{i}")
-                req.future = loop.create_future()
-                reqs.append(req)
-
-            # Only 1 result for 3 requests
-            scheduler._resolve_futures(reqs, ["only-one"])
-        finally:
-            loop.close()
+        # Only 1 result for 3 requests; first gets result, others get exception
+        scheduler._resolve_futures(reqs, [_make_result("r0")])
+        assert reqs[0].future.done() and reqs[0].future.result().response == "response-r0"
+        for req in reqs[1:]:
+            assert req.future.done() and req.future.exception() is not None
 
     def test_flush_empty_group_is_noop(
         self, queue: RequestQueue, config: BatchConfig
@@ -465,7 +472,7 @@ class TestBatchSchedulerEdgeCases:
         """flush_group on a non-existent group should be a no-op."""
         executed: List[List[QueuedRequest]] = []
 
-        def tracking_executor(batch: List[QueuedRequest]) -> List[str]:
+        def tracking_executor(batch: List[QueuedRequest]) -> List[InferenceResult]:
             executed.append(batch)
             return _success_executor(batch)
 

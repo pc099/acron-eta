@@ -152,7 +152,8 @@ class TestRouting:
             quality_threshold=4.5,
             latency_budget_ms=9999,
         )
-        assert result.model_used in ["gpt-4-turbo", "claude-opus-4"]
+        # Registry has gpt-4o, claude-opus-4, claude-3-5-sonnet
+        assert result.model_used in ["gpt-4o", "claude-opus-4", "claude-3-5-sonnet"]
 
 
 # ---------------------------------------------------------------------------
@@ -306,7 +307,7 @@ class TestInternalCalculateCost:
     """Tests for optimizer._calculate_cost."""
 
     def test_known_model(self, optimizer: InferenceOptimizer) -> None:
-        cost = optimizer._calculate_cost("gpt-4-turbo", 1000, 500)
+        cost = optimizer._calculate_cost("gpt-4o", 1000, 500)
         assert cost > 0
 
     def test_unknown_model_returns_zero(

@@ -9,9 +9,12 @@ and latency constraints.
 import logging
 import os
 import random
+import threading
 import time
 import uuid
-from typing import List, Literal, Optional, Tuple
+from concurrent.futures import Future
+from datetime import datetime, timedelta, timezone
+from typing import Any, Dict, List, Literal, Optional, Tuple
 
 from dotenv import load_dotenv
 from pydantic import BaseModel, Field
@@ -26,7 +29,12 @@ from src.embeddings.mismatch import MismatchCostCalculator
 from src.embeddings.similarity import SimilarityCalculator
 from src.embeddings.threshold import AdaptiveThresholdTuner
 from src.embeddings.vector_store import InMemoryVectorDB, VectorDatabase
-from src.exceptions import ModelNotFoundError, ProviderError
+from src.exceptions import (
+    BudgetExceededError,
+    ModelNotFoundError,
+    PermissionDeniedError,
+    ProviderError,
+)
 from src.models.registry import (
     ModelProfile,
     ModelRegistry,
@@ -44,6 +52,23 @@ from src.tracking.tracker import EventTracker, InferenceEvent
 
 load_dotenv()
 
+# Optional: batching queue (Step 5 full batching)
+try:
+    from src.batching.queue import QueuedRequest, RequestQueue
+except ImportError:
+    QueuedRequest = None  # type: ignore[misc, assignment]
+    RequestQueue = None  # type: ignore[misc, assignment]
+
+# Optional: token optimization and feature enrichment (Steps 3 & 4)
+try:
+    from src.features.enricher import EnrichmentResult, FeatureEnricher
+    from src.optimization.optimizer import OptimizationResult, TokenOptimizer
+except ImportError:
+    FeatureEnricher = None  # type: ignore[misc, assignment]
+    TokenOptimizer = None  # type: ignore[misc, assignment]
+    EnrichmentResult = None  # type: ignore[misc, assignment]
+    OptimizationResult = None  # type: ignore[misc, assignment]
+
 logger = logging.getLogger(__name__)
 
 
@@ -58,8 +83,12 @@ class InferenceResult(BaseModel):
         cost: Dollar cost for this request.
         latency_ms: End-to-end latency in milliseconds.
         cache_hit: Whether the result came from cache.
+        cache_tier: Cache tier that served (1, 2, 3) or 0 for miss.
         routing_reason: Explanation of model choice.
         request_id: UUID for tracing.
+        cost_original: Optional baseline cost for dashboard.
+        cost_savings_percent: Optional percent saved for dashboard.
+        optimization_techniques: Optional list of techniques applied.
     """
 
     response: str = ""
@@ -69,8 +98,12 @@ class InferenceResult(BaseModel):
     cost: float = 0.0
     latency_ms: float = 0.0
     cache_hit: bool = False
+    cache_tier: int = Field(default=0, ge=0, le=3)
     routing_reason: str = ""
     request_id: str = Field(default_factory=lambda: uuid.uuid4().hex[:12])
+    cost_original: Optional[float] = None
+    cost_savings_percent: Optional[float] = None
+    optimization_techniques: Optional[List[str]] = None
 
 
 class InferenceOptimizer:
@@ -99,6 +132,12 @@ class InferenceOptimizer:
         constraint_interpreter: Constraint interpreter (optional, auto-initialized if advanced_router used).
         enable_tier2: Enable Tier 2 semantic caching (default: True if semantic_cache provided).
         enable_tier3: Enable Tier 3 intermediate caching (default: True if components provided).
+        token_optimizer: Optional token optimizer (Step 3); reduces prompt tokens before inference.
+        feature_enricher: Optional feature enricher (Step 4); adds user/org context to prompt.
+        batch_engine: Optional batch engine (Step 5); evaluates batch eligibility.
+        request_queue: Optional queue for batching; when set with batch_scheduler, eligible requests are enqueued.
+        batch_scheduler: Optional scheduler; must be started by the app when request_queue is used.
+        governance_engine: Optional governance engine (Step 6); enforces policy and budget when org_id is set.
     """
 
     def __init__(
@@ -116,6 +155,12 @@ class InferenceOptimizer:
         constraint_interpreter: Optional[ConstraintInterpreter] = None,
         enable_tier2: Optional[bool] = None,
         enable_tier3: Optional[bool] = None,
+        token_optimizer: Optional[Any] = None,
+        feature_enricher: Optional[Any] = None,
+        batch_engine: Optional[Any] = None,
+        request_queue: Optional[Any] = None,
+        batch_scheduler: Optional[Any] = None,
+        governance_engine: Optional[Any] = None,
     ) -> None:
         self._registry = registry or ModelRegistry()
         self._cache = cache or Cache()
@@ -134,6 +179,14 @@ class InferenceOptimizer:
         self._task_detector = task_detector
         self._constraint_interpreter = constraint_interpreter
 
+        # Step 3, 4, 5 (optional)
+        self._token_optimizer = token_optimizer
+        self._feature_enricher = feature_enricher
+        self._batch_engine = batch_engine
+        self._request_queue = request_queue
+        self._batch_scheduler = batch_scheduler
+        self._governance_engine = governance_engine
+
         # Feature flags (auto-detect from component availability)
         self._enable_tier2 = (
             enable_tier2
@@ -151,6 +204,10 @@ class InferenceOptimizer:
 
         # Lazy initialization helpers
         self._phase2_initialized = False
+        # Connection pooling: one client per provider per process (thread-safe lazy init)
+        self._openai_client: Any = None
+        self._anthropic_client: Any = None
+        self._provider_lock = threading.Lock()
 
     # ------------------------------------------------------------------
     # Public API
@@ -164,6 +221,7 @@ class InferenceOptimizer:
         quality_threshold: Optional[float] = None,
         cost_budget: Optional[float] = None,
         user_id: Optional[str] = None,
+        organization_id: Optional[str] = None,
         routing_mode: RoutingMode = "autopilot",
         quality_preference: Optional[str] = None,
         latency_preference: Optional[str] = None,
@@ -181,6 +239,7 @@ class InferenceOptimizer:
             quality_threshold: Minimum quality score (0.0-5.0).
             cost_budget: Optional maximum dollar cost for this request.
             user_id: Optional caller identity.
+            organization_id: Optional organisation ID (for feature enrichment).
             routing_mode: Routing mode: "autopilot", "guided", or "explicit".
             quality_preference: Quality preference for GUIDED mode ("low", "medium", "high", "max").
             latency_preference: Latency preference for GUIDED mode ("low", "medium", "high").
@@ -208,8 +267,8 @@ class InferenceOptimizer:
                 routing_reason="Error: empty prompt",
             )
 
-        # 1. TIER 1: Exact match cache
-        cache_entry = self._check_cache(prompt)
+        # 1. TIER 1: Exact match cache (org-scoped when organization_id present)
+        cache_entry = self._check_cache(prompt, organization_id)
         if cache_entry is not None:
             result = InferenceResult(
                 response=cache_entry.response,
@@ -219,8 +278,10 @@ class InferenceOptimizer:
                 cost=0.0,
                 latency_ms=0.0,
                 cache_hit=True,
+                cache_tier=1,
                 routing_reason="Cache hit (exact match)",
                 request_id=request_id,
+                optimization_techniques=["cache_tier_1"],
             )
             self._log_event(
                 request_id=request_id,
@@ -260,11 +321,13 @@ class InferenceOptimizer:
                         cost=0.0,
                         latency_ms=0.0,
                         cache_hit=True,
+                        cache_tier=2,
                         routing_reason=(
                             f"Cache hit (semantic similarity: "
                             f"{semantic_result.similarity:.2f})"
                         ),
                         request_id=request_id,
+                        optimization_techniques=["semantic_cache"],
                     )
                     self._log_event(
                         request_id=request_id,
@@ -316,8 +379,10 @@ class InferenceOptimizer:
                             cost=0.0,
                             latency_ms=0.0,
                             cache_hit=True,
+                            cache_tier=3,
                             routing_reason="Cache hit (intermediate results)",
                             request_id=request_id,
+                            optimization_techniques=["cache_tier_3"],
                         )
                         self._log_event(
                             request_id=request_id,
@@ -338,10 +403,73 @@ class InferenceOptimizer:
                     extra={"request_id": request_id, "error": str(exc)},
                 )
 
+        # 3a. FEATURE ENRICHMENT (Step 4): add user/org context when IDs present
+        prompt_to_use = prompt
+        if self._feature_enricher is not None and (user_id or organization_id):
+            try:
+                enrichment_result = self._feature_enricher.enrich(
+                    prompt=prompt,
+                    user_id=user_id,
+                    organization_id=organization_id,
+                    task_type=task_id or "general",
+                )
+                if enrichment_result.features_available:
+                    prompt_to_use = enrichment_result.enriched_prompt
+                    logger.debug(
+                        "Prompt enriched",
+                        extra={
+                            "request_id": request_id,
+                            "features_used": len(enrichment_result.features_used),
+                        },
+                    )
+            except Exception as exc:
+                logger.warning(
+                    "Feature enrichment failed, using original prompt",
+                    extra={"request_id": request_id, "error": str(exc)},
+                )
+
+        # 3b. TOKEN OPTIMIZATION (Step 3): reduce prompt tokens when safe
+        if self._token_optimizer is not None:
+            try:
+                opt_settings = get_settings().optimization
+                opt_result = self._token_optimizer.optimize(
+                    prompt=prompt_to_use,
+                    system_prompt=None,
+                    history=None,
+                    examples=None,
+                    task_type=task_id or "general",
+                    quality_preference=quality_preference or "medium",
+                )
+                risk_order = {"none": 0, "low": 1, "medium": 2, "high": 3}
+                max_risk = risk_order.get(opt_settings.max_quality_risk, 2)
+                result_risk = risk_order.get(opt_result.quality_risk, 0)
+                if result_risk <= max_risk and opt_result.optimized_prompt:
+                    prompt_to_use = opt_result.optimized_prompt
+                    logger.debug(
+                        "Prompt token-optimized",
+                        extra={
+                            "request_id": request_id,
+                            "tokens_saved": opt_result.tokens_saved,
+                        },
+                    )
+                elif result_risk > max_risk:
+                    logger.debug(
+                        "Token optimization skipped (quality risk too high)",
+                        extra={
+                            "request_id": request_id,
+                            "quality_risk": opt_result.quality_risk,
+                        },
+                    )
+            except Exception as exc:
+                logger.warning(
+                    "Token optimization failed, using current prompt",
+                    extra={"request_id": request_id, "error": str(exc)},
+                )
+
         # 4. ROUTE: Use AdvancedRouter if available, otherwise basic Router
         if self._advanced_router is not None:
             decision = self._route_advanced(
-                prompt=prompt,
+                prompt=prompt_to_use,
                 mode=routing_mode,
                 quality_preference=quality_preference,
                 latency_preference=latency_preference,
@@ -358,11 +486,91 @@ class InferenceOptimizer:
             )
             decision = self._route(constraints)
 
-        # 3. EXECUTE INFERENCE
+        # 4b. BATCH ELIGIBILITY (Step 5): enqueue and wait, or fall through to execute
+        if (
+            self._batch_engine is not None
+            and self._request_queue is not None
+            and QueuedRequest is not None
+        ):
+            try:
+                eligibility = self._batch_engine.evaluate(
+                    prompt=prompt_to_use,
+                    task_type=task_id or "general",
+                    model=decision.model_name,
+                    latency_budget_ms=latency_budget_ms or 60_000,
+                )
+                if eligibility.eligible and eligibility.batch_group and eligibility.max_wait_ms is not None:
+                    infer_kwargs: Dict[str, Any] = {
+                        "prompt": prompt_to_use,
+                        "task_id": task_id,
+                        "latency_budget_ms": latency_budget_ms,
+                        "quality_threshold": quality_threshold,
+                        "cost_budget": cost_budget,
+                        "user_id": user_id,
+                        "organization_id": organization_id,
+                        "routing_mode": routing_mode,
+                        "quality_preference": quality_preference,
+                        "latency_preference": latency_preference,
+                        "model_override": decision.model_name,
+                        "document_id": document_id,
+                    }
+                    fut: Future[InferenceResult] = Future()
+                    deadline = datetime.now(timezone.utc) + timedelta(
+                        milliseconds=eligibility.max_wait_ms
+                    )
+                    qr = QueuedRequest(
+                        request_id=request_id,
+                        prompt=prompt_to_use,
+                        model=decision.model_name,
+                        batch_group=eligibility.batch_group,
+                        deadline=deadline,
+                        future=fut,
+                        infer_kwargs=infer_kwargs,
+                    )
+                    self._request_queue.enqueue(qr)
+                    timeout_sec = (eligibility.max_wait_ms / 1000.0) + 2.0
+                    try:
+                        batch_result = fut.result(timeout=timeout_sec)
+                        return batch_result
+                    except Exception:
+                        self._request_queue.remove(request_id)
+                        logger.debug(
+                            "Batch wait timed out or failed, executing individually",
+                            extra={"request_id": request_id},
+                        )
+            except Exception as exc:
+                logger.debug(
+                    "Batch eligibility or enqueue skipped",
+                    extra={"request_id": request_id, "error": str(exc)},
+                )
+
+        # 4c. GOVERNANCE (Step 6): policy and budget check when org_id present
+        if organization_id and self._governance_engine is not None:
+            try:
+                estimated_cost = self._estimate_cost_for_model(
+                    decision.model_name, prompt_to_use
+                )
+                allowed, reason = self._governance_engine.enforce_policy(
+                    organization_id, decision.model_name, estimated_cost
+                )
+                if not allowed:
+                    msg = reason or "Policy denied"
+                    if "budget" in msg.lower() or "limit" in msg.lower():
+                        raise BudgetExceededError(msg)
+                    raise PermissionDeniedError(msg)
+            except (BudgetExceededError, PermissionDeniedError):
+                raise
+            except Exception as exc:
+                logger.warning(
+                    "Governance check skipped",
+                    extra={"request_id": request_id, "error": str(exc)},
+                )
+
+        # 5. EXECUTE INFERENCE (use enriched/optimized prompt)
         start = time.time()
         try:
             response_text, actual_input, actual_output, provider_latency = (
-                self._execute_inference(decision.model_name, prompt)
+                self._execute_inference(decision.model_name, prompt_to_use)
             )
         except ProviderError:
             logger.warning(
@@ -378,7 +586,7 @@ class InferenceOptimizer:
             if fallback_model.name == decision.model_name:
                 raise
             response_text, actual_input, actual_output, provider_latency = (
-                self._execute_inference(fallback_model.name, prompt)
+                self._execute_inference(fallback_model.name, prompt_to_use)
             )
             decision = RoutingDecision(
                 model_name=fallback_model.name,
@@ -392,13 +600,24 @@ class InferenceOptimizer:
         model_profile = self._registry.get(decision.model_name)
         cost = calculate_cost(model_profile, actual_input, actual_output)
 
-        # 5. STORE IN ALL CACHE TIERS
+        # 4d. GOVERNANCE: record spend for budget tracking
+        if organization_id and self._governance_engine is not None:
+            try:
+                self._governance_engine.record_spend(organization_id, cost)
+            except Exception as exc:
+                logger.debug(
+                    "Governance record_spend skipped",
+                    extra={"request_id": request_id, "error": str(exc)},
+                )
+
+        # 5. STORE IN ALL CACHE TIERS (org-scoped for Tier 1 when organization_id present)
         # Tier 1: Exact match
         self._cache.set(
             query=prompt,
             response=response_text,
             model=decision.model_name,
             cost=cost,
+            org_id=organization_id,
         )
 
         # Tier 2: Semantic cache
@@ -463,22 +682,40 @@ class InferenceOptimizer:
             cost=cost,
             latency_ms=round(total_latency_ms, 1),
             cache_hit=False,
+            cache_tier=0,
             routing_reason=decision.reason,
             request_id=request_id,
         )
 
-    def get_metrics(self) -> dict:
+    def get_metrics(self) -> Dict[str, Any]:
         """Return current metrics summary including cache and uptime.
 
         Returns:
-            Dict with analytics from the tracker plus cache stats.
+            Dict with analytics from the tracker plus cache stats and
+            per-tier hit counts (tier1_hits, tier2_hits, tier3_hits).
         """
-        summary = self._tracker.get_metrics()
+        summary: Dict[str, Any] = dict(self._tracker.get_metrics())
         cache_stats = self._cache.stats()
         summary["cache_size"] = cache_stats.entry_count
         summary["cache_hit_rate"] = round(cache_stats.hit_rate, 4)
         summary["cache_cost_saved"] = cache_stats.total_cost_saved
         summary["uptime_seconds"] = round(time.time() - self._start_time, 1)
+        summary["tier1_hits"] = cache_stats.hits
+        summary["tier1_misses"] = cache_stats.misses
+        if self._semantic_cache is not None:
+            t2 = self._semantic_cache.stats()
+            summary["tier2_hits"] = t2.get("hits", 0)
+            summary["tier2_misses"] = t2.get("misses", 0)
+        else:
+            summary["tier2_hits"] = 0
+            summary["tier2_misses"] = 0
+        if self._intermediate_cache is not None:
+            t3 = self._intermediate_cache.stats()
+            summary["tier3_hits"] = t3.get("hits", 0)
+            summary["tier3_misses"] = t3.get("misses", 0)
+        else:
+            summary["tier3_hits"] = 0
+            summary["tier3_misses"] = 0
         return summary
 
     # ------------------------------------------------------------------
@@ -504,9 +741,11 @@ class InferenceOptimizer:
     # Internal helpers
     # ------------------------------------------------------------------
 
-    def _check_cache(self, prompt: str) -> Optional[CacheEntry]:
+    def _check_cache(
+        self, prompt: str, org_id: Optional[str] = None
+    ) -> Optional[CacheEntry]:
         """Delegate cache lookup to the cache component."""
-        return self._cache.get(prompt)
+        return self._cache.get(prompt, org_id=org_id)
 
     def _route(self, constraints: RoutingConstraints) -> RoutingDecision:
         """Delegate model selection to the basic router."""
@@ -583,6 +822,16 @@ class InferenceOptimizer:
         output_tokens = max(20, int(input_tokens * 0.6))  # Estimate output
         return calculate_cost(model, input_tokens, output_tokens)
 
+    def _estimate_cost_for_model(self, model_name: str, prompt: str) -> float:
+        """Estimate cost for a given model and prompt (for governance checks)."""
+        try:
+            profile = self._registry.get(model_name)
+        except Exception:
+            return 0.0
+        input_tokens = estimate_tokens(prompt)
+        output_tokens = max(20, int(input_tokens * 0.6))
+        return calculate_cost(profile, input_tokens, output_tokens)
+
     def _execute_inference(
         self, model_name: str, prompt: str
     ) -> Tuple[str, int, int, int]:
@@ -638,11 +887,14 @@ class InferenceOptimizer:
     def _call_openai(
         self, model_name: str, prompt: str
     ) -> Tuple[str, int, int, int]:
-        """Call the OpenAI API."""
+        """Call the OpenAI API. Reuses a single client per process for connection pooling."""
         from openai import OpenAI
 
+        with self._provider_lock:
+            if self._openai_client is None:
+                self._openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+            client = self._openai_client
         start = time.time()
-        client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
         response = client.chat.completions.create(
             model=model_name,
             messages=[{"role": "user", "content": prompt}],
@@ -663,11 +915,16 @@ class InferenceOptimizer:
     def _call_anthropic(
         self, model_name: str, prompt: str
     ) -> Tuple[str, int, int, int]:
-        """Call the Anthropic API."""
+        """Call the Anthropic API. Reuses a single client per process for connection pooling."""
         import anthropic
 
+        with self._provider_lock:
+            if self._anthropic_client is None:
+                self._anthropic_client = anthropic.Anthropic(
+                    api_key=os.getenv("ANTHROPIC_API_KEY")
+                )
+            client = self._anthropic_client
         start = time.time()
-        client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
         response = client.messages.create(
             model=model_name,
             max_tokens=1024,

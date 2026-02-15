@@ -6,6 +6,7 @@ for development/testing and a Pinecone implementation for production.
 """
 
 import logging
+import os
 from typing import Any, Dict, List, Optional, Protocol, runtime_checkable
 
 import numpy as np
@@ -190,3 +191,110 @@ class InMemoryVectorDB:
     def count(self) -> int:
         """Return total number of stored vectors."""
         return len(self._vectors)
+
+
+# Optional Pinecone backend (Step 7); requires pinecone package (pip install pinecone)
+try:
+    from pinecone import Pinecone
+except Exception:
+    Pinecone = None  # type: ignore[misc, assignment]
+
+
+class PineconeVectorDB:
+    """Pinecone-backed vector database for Tier 2 semantic cache (production).
+
+    Requires PINECONE_API_KEY and an index with matching dimension and cosine metric.
+    """
+
+    def __init__(
+        self,
+        api_key: Optional[str] = None,
+        index_name: str = "asahi-vectors",
+        dimension: int = 1024,
+        namespace: Optional[str] = None,
+    ) -> None:
+        if Pinecone is None:
+            raise VectorDBError("pinecone-client is not installed")
+        key = api_key or os.environ.get("PINECONE_API_KEY")
+        if not key:
+            raise VectorDBError("PINECONE_API_KEY is required")
+        self._pc = Pinecone(api_key=key)
+        self._index_name = index_name
+        self._dimension = dimension
+        self._namespace = namespace or ""
+        self._index = self._pc.Index(index_name)
+        logger.info(
+            "PineconeVectorDB initialised",
+            extra={"index": index_name, "dimension": dimension},
+        )
+
+    def upsert(self, entries: List[VectorDBEntry]) -> int:
+        """Insert or update vectors in Pinecone."""
+        if not entries:
+            return 0
+        vectors = []
+        for entry in entries:
+            if len(entry.embedding) != self._dimension:
+                raise VectorDBError(
+                    f"Dimension mismatch: expected {self._dimension}, got {len(entry.embedding)}"
+                )
+            vectors.append({
+                "id": entry.vector_id,
+                "values": entry.embedding,
+                "metadata": entry.metadata,
+            })
+        ns = self._namespace or None
+        self._index.upsert(vectors=vectors, namespace=ns)
+        return len(vectors)
+
+    def query(
+        self,
+        embedding: List[float],
+        top_k: int = 5,
+        filter: Optional[Dict[str, Any]] = None,
+    ) -> List[VectorSearchResult]:
+        """Find the top-k most similar vectors (cosine)."""
+        if len(embedding) != self._dimension:
+            raise VectorDBError(
+                f"Query dimension mismatch: expected {self._dimension}, got {len(embedding)}"
+            )
+        ns = self._namespace or None
+        resp = self._index.query(
+            vector=embedding,
+            top_k=top_k,
+            include_metadata=True,
+            namespace=ns,
+        )
+        results = []
+        for match in getattr(resp, "matches", []) or []:
+            score = getattr(match, "score", 0.0) or 0.0
+            meta = getattr(match, "metadata", None) or {}
+            results.append(
+                VectorSearchResult(
+                    vector_id=getattr(match, "id", ""),
+                    score=float(score),
+                    metadata=meta,
+                )
+            )
+        return results
+
+    def delete(self, vector_ids: List[str]) -> int:
+        """Delete vectors by ID."""
+        if not vector_ids:
+            return 0
+        ns = self._namespace or None
+        self._index.delete(ids=vector_ids, namespace=ns)
+        return len(vector_ids)
+
+    def count(self) -> int:
+        """Return total vector count (Pinecone index stats)."""
+        try:
+            stats = self._index.describe_index_stats()
+            ns = self._namespace or ""
+            if ns and hasattr(stats, "namespaces") and stats.namespaces:
+                ns_stats = stats.namespaces.get(ns)
+                return int(ns_stats.total_vector_count) if ns_stats else 0
+            return int(getattr(stats, "total_vector_count", 0) or 0)
+        except Exception as exc:
+            logger.warning("Pinecone index stats failed", extra={"error": str(exc)})
+            return 0

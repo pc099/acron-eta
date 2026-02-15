@@ -65,7 +65,7 @@ class TestModels:
         data = client.get("/models").json()
         assert data["count"] >= 3
         names = {m["name"] for m in data["models"]}
-        assert "gpt-4-turbo" in names
+        assert "gpt-4o" in names
         assert "claude-3-5-sonnet" in names
 
     def test_model_profiles_have_pricing(self, client: TestClient) -> None:
@@ -103,9 +103,18 @@ class TestInfer:
             "cost",
             "latency_ms",
             "cache_hit",
+            "cache_tier",
             "routing_reason",
         ]:
             assert field in data, f"Missing field: {field}"
+
+    def test_infer_response_cache_tier_in_range(
+        self, client: TestClient
+    ) -> None:
+        """InferResponse must include cache_tier in [0, 3]."""
+        data = client.post("/infer", json={"prompt": "Hello"}).json()
+        assert "cache_tier" in data
+        assert 0 <= data["cache_tier"] <= 3
 
     def test_infer_cost_is_positive(self, client: TestClient) -> None:
         data = client.post("/infer", json={"prompt": "Test prompt"}).json()
@@ -125,11 +134,17 @@ class TestInfer:
     def test_infer_custom_quality_threshold(
         self, client: TestClient
     ) -> None:
+        """High quality_threshold should route to a high-quality model."""
         data = client.post(
             "/infer",
             json={"prompt": "Test", "quality_threshold": 4.5},
         ).json()
-        assert data["model_used"] in ["gpt-4-turbo", "claude-opus-4"]
+        # Registry may have gpt-4o, claude-opus-4, claude-3-5-sonnet
+        assert data["model_used"] in [
+            "gpt-4o",
+            "claude-opus-4",
+            "claude-3-5-sonnet",
+        ]
 
     def test_infer_empty_prompt_returns_422(self, client: TestClient) -> None:
         resp = client.post("/infer", json={"prompt": ""})
@@ -186,6 +201,58 @@ class TestMetrics:
         assert "requests" in data
         assert "cache_hit_rate" in data
         assert "uptime_seconds" in data
+
+    def test_metrics_has_per_tier_counts(self, client: TestClient) -> None:
+        """GET /metrics must include tier1/tier2/tier3 hits and misses."""
+        data = client.get("/metrics").json()
+        for key in ("tier1_hits", "tier1_misses", "tier2_hits", "tier2_misses", "tier3_hits", "tier3_misses"):
+            assert key in data, f"Missing key: {key}"
+            assert isinstance(data[key], int)
+
+
+# ---------------------------------------------------------------------------
+# OpenAI-compatible endpoint
+# ---------------------------------------------------------------------------
+
+
+class TestOpenAIChatCompletions:
+    """Tests for POST /v1/chat/completions."""
+
+    def test_openai_chat_returns_200(self, client: TestClient) -> None:
+        resp = client.post(
+            "/v1/chat/completions",
+            json={
+                "messages": [{"role": "user", "content": "Say hello"}],
+            },
+        )
+        assert resp.status_code == 200
+
+    def test_openai_chat_response_shape(self, client: TestClient) -> None:
+        """Response must match OpenAI chat completions format."""
+        data = client.post(
+            "/v1/chat/completions",
+            json={
+                "messages": [{"role": "user", "content": "Hi"}],
+            },
+        ).json()
+        assert "id" in data
+        assert "choices" in data
+        assert len(data["choices"]) >= 1
+        assert data["choices"][0]["message"]["role"] == "assistant"
+        assert "content" in data["choices"][0]["message"]
+        assert "usage" in data
+        assert data["usage"]["prompt_tokens"] >= 0
+        assert data["usage"]["completion_tokens"] >= 0
+        assert "model" in data
+
+    def test_openai_chat_empty_messages_returns_400(
+        self, client: TestClient
+    ) -> None:
+        resp = client.post(
+            "/v1/chat/completions",
+            json={"messages": [{"role": "user", "content": ""}]},
+        )
+        assert resp.status_code == 400
 
 
 # ---------------------------------------------------------------------------

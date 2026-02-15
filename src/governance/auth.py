@@ -4,13 +4,16 @@ API key authentication middleware.
 Generates, validates, and revokes API keys with bcrypt hashing
 and configurable expiration.  Keys follow the format
 ``ask_{org_prefix}_{random_hex}``.
+
+When a key_store is provided (e.g. DbKeyStore for PostgreSQL),
+keys are persisted and validated from the store.
 """
 
 import logging
 import secrets
 import threading
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Protocol
 
 import bcrypt
 from pydantic import BaseModel, Field
@@ -18,6 +21,22 @@ from pydantic import BaseModel, Field
 from src.config import get_settings
 
 logger = logging.getLogger(__name__)
+
+
+class KeyStoreProtocol(Protocol):
+    """Protocol for key storage (in-memory or DB)."""
+
+    def get_by_prefix(self, key_prefix: str) -> Optional["_StoredKey"]:
+        """Return stored key by 12-char prefix, or None."""
+        ...
+
+    def store(self, stored: "_StoredKey", full_key: str) -> None:
+        """Persist a new key."""
+        ...
+
+    def revoke_by_prefix(self, key_prefix: str) -> bool:
+        """Revoke key by prefix. Returns True if found and revoked."""
+        ...
 
 
 # ── Data Models ────────────────────────────────────────
@@ -84,9 +103,15 @@ class AuthMiddleware:
 
     Args:
         config: Authentication configuration.
+        key_store: Optional store for keys (e.g. DbKeyStore). When set,
+            validate and generate use it; otherwise in-memory only.
     """
 
-    def __init__(self, config: Optional[AuthConfig] = None) -> None:
+    def __init__(
+        self,
+        config: Optional[AuthConfig] = None,
+        key_store: Optional[KeyStoreProtocol] = None,
+    ) -> None:
         if config is None:
             _s = get_settings().governance
             config = AuthConfig(
@@ -95,10 +120,14 @@ class AuthMiddleware:
                 key_prefix=_s.auth_key_prefix,
             )
         self._config = config
+        self._key_store = key_store
         self._lock = threading.Lock()
-        # key_display_prefix -> _StoredKey
+        # key_display_prefix -> _StoredKey (in-memory cache when no key_store)
         self._keys: Dict[str, _StoredKey] = {}
-        logger.info("AuthMiddleware initialised", extra={})
+        logger.info(
+            "AuthMiddleware initialised",
+            extra={"key_store": "db" if key_store else "memory"},
+        )
 
     # ------------------------------------------------------------------
     # Key generation
@@ -147,6 +176,18 @@ class AuthMiddleware:
         with self._lock:
             self._keys[display_prefix] = stored
 
+        if self._key_store is not None:
+            try:
+                self._key_store.store(stored, full_key)
+            except Exception as e:
+                logger.error(
+                    "Failed to persist API key to store",
+                    extra={"prefix": display_prefix, "error": str(e)},
+                )
+                with self._lock:
+                    self._keys.pop(display_prefix, None)
+                raise
+
         logger.info(
             "API key generated",
             extra={
@@ -174,8 +215,18 @@ class AuthMiddleware:
             return AuthResult(authenticated=False)
 
         display_prefix = key[:12]
-        with self._lock:
-            stored = self._keys.get(display_prefix)
+        stored: Optional[_StoredKey] = None
+        if self._key_store is not None:
+            try:
+                stored = self._key_store.get_by_prefix(display_prefix)
+            except Exception as e:
+                logger.warning(
+                    "Key store get failed",
+                    extra={"prefix": display_prefix, "error": str(e)},
+                )
+        if stored is None:
+            with self._lock:
+                stored = self._keys.get(display_prefix)
 
         if not stored:
             logger.warning(
@@ -257,14 +308,25 @@ class AuthMiddleware:
         Returns:
             True if the key was found and revoked, False otherwise.
         """
+        found = False
         with self._lock:
             stored = self._keys.get(key_display_prefix)
-            if not stored:
-                return False
-            stored.revoked = True
-
-        logger.info(
-            "API key revoked",
-            extra={"prefix": key_display_prefix},
-        )
-        return True
+            if stored:
+                stored.revoked = True
+                found = True
+        if self._key_store is not None:
+            try:
+                found = (
+                    self._key_store.revoke_by_prefix(key_display_prefix) or found
+                )
+            except Exception as e:
+                logger.warning(
+                    "Key store revoke failed",
+                    extra={"prefix": key_display_prefix, "error": str(e)},
+                )
+        if found:
+            logger.info(
+                "API key revoked",
+                extra={"prefix": key_display_prefix},
+            )
+        return found

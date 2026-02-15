@@ -65,6 +65,11 @@ curl http://localhost:8000/analytics/cost-breakdown?period=day&group_by=model
 
 # Interactive API docs
 open http://localhost:8000/docs
+
+# Full API contract and OpenAPI: docs/API_CONTRACT.md
+# OpenAPI schema: GET http://localhost:8000/openapi.json
+# Quick start: docs/QUICK_START.md | Integration: docs/INTEGRATION_GUIDE.md | ROI/pricing: docs/ROI_PRICING.md
+# Observability: docs/PROMETHEUS_SCRAPE.md | Load test: docs/LOAD_TEST.md
 ```
 
 ## Models

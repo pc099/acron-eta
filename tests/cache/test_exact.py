@@ -84,6 +84,21 @@ class TestCache:
         removed = cache.invalidate("nonexistent")
         assert removed is False
 
+    def test_org_id_cache_isolation(self, cache: Cache) -> None:
+        """Same prompt with different org_id yields separate entries; invalidate is org-scoped."""
+        prompt = "Same prompt"
+        cache.set(prompt, "response org1", "model", 0.01, org_id="org1")
+        cache.set(prompt, "response org2", "model", 0.02, org_id="org2")
+        assert cache.get(prompt) is None  # no org_id = no match
+        assert cache.get(prompt, org_id="org1") is not None
+        assert cache.get(prompt, org_id="org1").response == "response org1"
+        assert cache.get(prompt, org_id="org2") is not None
+        assert cache.get(prompt, org_id="org2").response == "response org2"
+        removed = cache.invalidate(prompt, org_id="org1")
+        assert removed is True
+        assert cache.get(prompt, org_id="org1") is None
+        assert cache.get(prompt, org_id="org2") is not None
+
     def test_clear(self, cache: Cache) -> None:
         cache.set("q1", "r1", "model", 0.01)
         cache.set("q2", "r2", "model", 0.02)

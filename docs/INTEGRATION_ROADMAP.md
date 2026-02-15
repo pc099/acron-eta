@@ -6,6 +6,23 @@
 
 ---
 
+## Implementation status (as of production build)
+
+| Step | Description | Status |
+|------|-------------|--------|
+| Step 1 | Global exception handler | Done |
+| Step 2 | Phase 2 pipeline (Tier 2/3, AdvancedRouter) | Done |
+| Step 3 | Token optimization in pipeline | Done |
+| Step 4 | Feature store (FeatureEnricher) in pipeline | Done |
+| Step 5 | Batching (queue + scheduler + executor) | Done |
+| Step 6 | Auth and governance (RBAC, policy/budget, audit) | Done |
+| Step 7 | Infrastructure (PostgreSQL, Redis, Pinecone) | Done |
+| Step 8 | Phase 8 Agent Swarm | Future |
+
+See `docs/PRODUCTION_ROADMAP_DETAILED.md` for the unified production plan and remaining Phase 3–4 (GTM, pricing, onboarding, docs).
+
+---
+
 ## Table of Contents
 
 1. [Executive Summary](#1-executive-summary)
