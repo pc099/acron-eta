@@ -12,7 +12,7 @@ keys are persisted and validated from the store.
 import logging
 import secrets
 import threading
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional, Protocol
 
 import bcrypt
@@ -243,8 +243,12 @@ class AuthMiddleware:
             )
             return AuthResult(authenticated=False)
 
-        # Check expiration
-        if datetime.utcnow() > stored.expires_at:
+        # Check expiration (use timezone-aware UTC to match DB/stored values)
+        now = datetime.now(timezone.utc)
+        expires_at = stored.expires_at
+        if expires_at.tzinfo is None:
+            expires_at = expires_at.replace(tzinfo=timezone.utc)
+        if now > expires_at:
             logger.warning(
                 "Expired API key used",
                 extra={"prefix": display_prefix},
