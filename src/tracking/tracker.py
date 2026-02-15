@@ -132,6 +132,7 @@ class EventTracker:
                 "requests_by_model": {},
                 "estimated_savings_vs_gpt4": 0.0,
                 "absolute_savings": 0.0,
+                "avg_quality": None,
             }
 
         total_cost = sum(e.cost for e in events)
@@ -158,6 +159,13 @@ class EventTracker:
         savings = gpt4_total - total_cost if gpt4_total > 0 else 0.0
         savings_pct = (savings / gpt4_total * 100) if gpt4_total > 0 else 0.0
 
+        quality_scores = [e.quality_score for e in events if e.quality_score is not None]
+        avg_quality = (
+            round(sum(quality_scores) / len(quality_scores), 1)
+            if quality_scores
+            else None
+        )
+
         return {
             "total_cost": round(total_cost, 4),
             "gpt4_equivalent_cost": round(gpt4_total, 4),
@@ -168,6 +176,7 @@ class EventTracker:
             "requests_by_model": requests_by_model,
             "estimated_savings_vs_gpt4": round(savings_pct, 1),
             "absolute_savings": round(savings, 4),
+            "avg_quality": avg_quality,
         }
 
     def get_events(

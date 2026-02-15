@@ -67,10 +67,14 @@ export default function DashboardPage() {
   const totalCost = metrics?.total_cost ?? summary?.total_cost ?? 0;
   const requests = metrics?.requests ?? summary?.total_requests ?? 0;
   const savings = metrics?.cache_cost_saved ?? summary?.cache_cost_saved ?? 0;
+  const avgQuality = metrics?.avg_quality ?? summary?.avg_quality;
   const tier1 = Number(metrics?.tier1_hits ?? 0);
   const tier2 = Number(metrics?.tier2_hits ?? 0);
   const tier3 = Number(metrics?.tier3_hits ?? 0);
   const totalHits = tier1 + tier2 + tier3;
+
+  const formatCost = (n: number) =>
+    n >= 0.01 ? `$${n.toFixed(2)}` : (n > 0 ? `$${n.toFixed(4)}` : "$0.00");
 
   const pieData = [
     { name: "Tier 1", value: tier1, color: ORANGE },
@@ -119,6 +123,10 @@ export default function DashboardPage() {
       title="Dashboard"
       subtitle="Monitor your ACRON optimization metrics"
     >
+      <div className="flex items-center gap-2 mb-2 text-sm text-neutral-dark-gray">
+        <span className="w-2 h-2 rounded-full bg-emerald-500" aria-hidden />
+        <span>ACRON Engine connected</span>
+      </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         <MetricCard
           value={totalHits > 0 ? Math.round(cacheHitRate) : "—"}
@@ -132,12 +140,20 @@ export default function DashboardPage() {
         />
         <MetricCard
           value={
-            typeof totalCost === "number" ? `$${totalCost.toFixed(2)}` : "—"
+            typeof totalCost === "number" ? formatCost(totalCost) : "—"
           }
           label="Total Cost"
           highlight
         />
-        <MetricCard value="—" label="Quality" unit="/5" />
+        <MetricCard
+          value={
+            typeof avgQuality === "number" && !Number.isNaN(avgQuality)
+              ? avgQuality.toFixed(1)
+              : "—"
+          }
+          label="Quality"
+          unit="/5"
+        />
       </div>
 
       <div className="grid md:grid-cols-2 gap-6 mb-8">

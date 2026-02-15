@@ -988,8 +988,15 @@ class InferenceOptimizer:
         task_type: Optional[str] = None,
         user_id: Optional[str] = None,
         organization_id: Optional[str] = None,
+        quality_score: Optional[float] = None,
     ) -> None:
         """Create and log an InferenceEvent."""
+        if quality_score is None and event_model and event_model != "cached":
+            try:
+                profile = self._registry.get(event_model)
+                quality_score = getattr(profile, "quality_score", None)
+            except Exception:
+                quality_score = None
         event = InferenceEvent(
             request_id=request_id,
             model_selected=event_model,
@@ -1003,6 +1010,7 @@ class InferenceOptimizer:
             task_type=task_type,
             user_id=user_id,
             organization_id=organization_id,
+            quality_score=quality_score,
         )
         self._tracker.log_event(event)
 

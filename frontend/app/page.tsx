@@ -1,12 +1,29 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Navbar } from "@/components/Navbar";
 import { Button } from "@/components/Button";
 import { FeatureCard } from "@/components/Card";
 import { MetricCard } from "@/components/MetricCard";
+import { getBaseUrlClient } from "@/lib/api";
 
 export default function LandingPage() {
+  const [engineStatus, setEngineStatus] = useState<"checking" | "ready" | "offline">("checking");
+
+  useEffect(() => {
+    const base = getBaseUrlClient();
+    if (!base) {
+      setEngineStatus("ready");
+      return;
+    }
+    const url = `${base.replace(/\/$/, "")}/health`;
+    fetch(url, { method: "GET" })
+      .then((r) => (r.ok ? "ready" : "offline"))
+      .catch(() => "offline")
+      .then(setEngineStatus);
+  }, []);
+
   return (
     <div className="bg-acron-black text-white min-h-screen">
       <Navbar />
@@ -40,12 +57,34 @@ export default function LandingPage() {
             </div>
           </div>
           <div className="bg-neutral-dark rounded-card border border-neutral-border p-12 h-80 flex items-center justify-center relative overflow-hidden group">
-            {/* Graphical Loading Screen Placeholder / Logo Animation */}
-             <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-acron-primary_accent/10 to-transparent opacity-0 group-hover:opacity-100 transition duration-700"></div>
-            <div className="text-center text-neutral-dark-gray z-10">
-               <div className="w-16 h-16 border-t-2 border-acron-primary_accent rounded-full animate-spin mb-4 mx-auto"></div>
-              <p className="text-sm font-mono text-acron-primary_accent">ACRON ENGINE</p>
-              <p className="text-xs mt-2 opacity-60">Initializing...</p>
+            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-acron-primary_accent/10 to-transparent opacity-0 group-hover:opacity-100 transition duration-700" />
+            <div className="text-center z-10">
+              {engineStatus === "checking" && (
+                <>
+                  <div className="w-16 h-16 border-t-2 border-acron-primary_accent rounded-full animate-spin mb-4 mx-auto" />
+                  <p className="text-sm font-mono text-acron-primary_accent">ACRON ENGINE</p>
+                  <p className="text-xs mt-2 text-neutral-dark-gray">Checking...</p>
+                </>
+              )}
+              {engineStatus === "ready" && (
+                <>
+                  <div className="w-16 h-16 rounded-full bg-acron-primary_accent/20 border-2 border-acron-primary_accent flex items-center justify-center mb-4 mx-auto">
+                    <span className="text-2xl text-acron-primary_accent">✓</span>
+                  </div>
+                  <p className="text-sm font-mono text-acron-primary_accent">ACRON ENGINE</p>
+                  <p className="text-xs mt-2 text-neutral-dark-gray">Ready to optimize</p>
+                  <p className="text-xs mt-1 text-neutral-dark-gray/80">Sign in or sign up to use the dashboard</p>
+                </>
+              )}
+              {engineStatus === "offline" && (
+                <>
+                  <div className="w-16 h-16 rounded-full bg-neutral-border flex items-center justify-center mb-4 mx-auto">
+                    <span className="text-xl text-neutral-dark-gray">⟳</span>
+                  </div>
+                  <p className="text-sm font-mono text-acron-primary_accent">ACRON ENGINE</p>
+                  <p className="text-xs mt-2 text-neutral-dark-gray">Configure API URL in Settings to check status</p>
+                </>
+              )}
             </div>
           </div>
         </div>

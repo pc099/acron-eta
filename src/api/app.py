@@ -774,6 +774,7 @@ def create_app(use_mock: bool = False) -> FastAPI:
                 "tier3_hits": 0,
                 "tier3_misses": 0,
                 "uptime_seconds": round(time.time() - request.app.state.start_time, 1),
+                "avg_quality": None,
             }
         return optimizer.get_metrics(org_id=org_id)
 
@@ -970,6 +971,7 @@ def create_app(use_mock: bool = False) -> FastAPI:
                     "estimated_savings_vs_gpt4": 0.0,
                     "absolute_savings": 0.0,
                     "uptime_seconds": round(time.time() - request.app.state.start_time, 1),
+                    "avg_quality": None,
                 }
             )
         metrics = optimizer.get_metrics(org_id=org_id)
@@ -982,6 +984,7 @@ def create_app(use_mock: bool = False) -> FastAPI:
             "estimated_savings_vs_gpt4": metrics.get("estimated_savings_vs_gpt4", 0.0),
             "absolute_savings": metrics.get("absolute_savings", 0.0),
             "uptime_seconds": metrics.get("uptime_seconds", 0.0),
+            "avg_quality": metrics.get("avg_quality"),
         }
         return AnalyticsResponse(data=data)
 
