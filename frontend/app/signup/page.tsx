@@ -2,108 +2,115 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Navbar } from "@/components/Navbar";
+import { useRouter } from "next/navigation";
+import { Card } from "@/components/Card";
 import { Button } from "@/components/Button";
 import { Input } from "@/components/Input";
 import { signup } from "@/lib/api";
 
 export default function SignupPage() {
-  const [orgName, setOrgName] = useState("");
-  const [userId, setUserId] = useState("");
+  const router = useRouter();
   const [email, setEmail] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [password, setPassword] = useState("");
+  const [fullName, setFullName] = useState("");
+  const [orgName, setOrgName] = useState("");
   const [error, setError] = useState("");
-  const [result, setResult] = useState<{
-    org_id: string;
-    api_key: string;
-    org_name: string;
-    message: string;
-  } | null>(null);
+  const [loading, setLoading] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
-    setResult(null);
-    if (!orgName.trim() || !userId.trim()) {
-      setError("Organization name and user ID are required.");
-      return;
-    }
     setLoading(true);
+
     try {
-      const data = await signup(orgName.trim(), userId.trim(), email.trim() || undefined);
-      setResult(data);
-      if (typeof window !== "undefined") {
-        localStorage.setItem("asahi_api_key", data.api_key);
-        localStorage.setItem("asahi_org_id", data.org_id);
+      const res = await signup({ email, password, full_name: fullName, org_name: orgName });
+      if (res.api_key) {
+        if (typeof window !== "undefined") {
+          localStorage.setItem("acron_api_key", res.api_key);
+        }
+        router.push("/dashboard");
+      } else {
+        setError("Signup failed: No API key returned.");
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Signup failed.");
+      setError(err instanceof Error ? err.message : "Signup failed");
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <div className="min-h-screen bg-neutral-white">
-      <Navbar />
-      <main className="pt-28 pb-16 px-6 max-w-md mx-auto">
-        <h1 className="text-2xl font-bold text-neutral-dark mb-2">Create your account</h1>
-        <p className="text-neutral-dark-gray mb-8">
-          Get an API key and start optimizing inference costs.
-        </p>
-        {result ? (
-          <div className="rounded-card border border-semantic-success bg-green-50 p-6">
-            <p className="font-medium text-neutral-dark mb-2">Account created</p>
-            <p className="text-sm text-neutral-dark-gray mb-4">{result.message}</p>
-            <p className="text-xs text-neutral-dark-gray">
-              <strong>Org ID:</strong> {result.org_id}
-            </p>
-            <p className="text-xs text-neutral-dark-gray mt-1">
-              <strong>API key:</strong> Saved to this browser. Use Settings to view or change it.
-            </p>
-            <Link href="/dashboard" className="mt-6 inline-block">
-              <Button variant="primary">Go to Dashboard</Button>
-            </Link>
+    <div className="min-h-screen bg-black flex flex-col items-center justify-center p-6">
+      <Link href="/" className="mb-8 flex items-center gap-2">
+         {/* Simple Logo Placeholder */}
+         <div className="w-8 h-8 rounded bg-white flex items-center justify-center">
+            <span className="text-black font-bold text-xs">A</span>
           </div>
-        ) : (
-          <form onSubmit={handleSubmit}>
-            <Input
-              label="Organization name"
-              placeholder="Acme Corp"
-              value={orgName}
-              onChange={(e) => setOrgName(e.target.value)}
-              required
-            />
-            <Input
-              label="User ID"
-              placeholder="dev1"
-              value={userId}
-              onChange={(e) => setUserId(e.target.value)}
-              required
-            />
-            <Input
-              label="Email (optional)"
-              type="email"
-              placeholder="you@example.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
-            {error && (
-              <p className="text-sm text-semantic-error mb-4">{error}</p>
-            )}
-            <Button type="submit" disabled={loading} className="w-full">
-              {loading ? "Creating…" : "Sign Up"}
-            </Button>
-          </form>
-        )}
-        <p className="mt-8 text-center text-sm text-neutral-dark-gray">
-          Already have an key?{" "}
-          <Link href="/dashboard" className="text-asahi-orange hover:underline">
-            Go to Dashboard
-          </Link>{" "}
-          and set it in Settings.
+        <span className="text-2xl font-bold text-white tracking-wide">ACRON</span>
+      </Link>
+
+      <Card className="w-full max-w-md border-neutral-border bg-neutral-dark">
+        <h1 className="text-2xl font-bold text-white mb-2 text-center">Create Account</h1>
+        <p className="text-neutral-dark-gray text-center mb-8">
+          Start optimizing your inference costs
         </p>
-      </main>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <Input
+            label="Full Name"
+            placeholder="John Doe"
+            value={fullName}
+            onChange={(e) => setFullName(e.target.value)}
+            className="bg-black border-neutral-border text-white placeholder-neutral-dark-gray focus:border-acron-primary_accent"
+          />
+          <Input
+            label="Email"
+            type="email"
+            placeholder="you@example.com"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+            className="bg-black border-neutral-border text-white placeholder-neutral-dark-gray focus:border-acron-primary_accent"
+          />
+          <Input
+            label="Password"
+            type="password"
+            placeholder="••••••••"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            className="bg-black border-neutral-border text-white placeholder-neutral-dark-gray focus:border-acron-primary_accent"
+          />
+          <Input
+            label="Organization Name (Optional)"
+            placeholder="Acme Corp"
+            value={orgName}
+            onChange={(e) => setOrgName(e.target.value)}
+            className="bg-black border-neutral-border text-white placeholder-neutral-dark-gray focus:border-acron-primary_accent"
+          />
+
+          {error && (
+            <div className="p-3 rounded bg-red-900/20 border border-semantic-error text-semantic-error text-sm">
+              {error}
+            </div>
+          )}
+
+          <Button
+            variant="primary"
+            className="w-full justify-center mt-6"
+            disabled={loading}
+          >
+            {loading ? "Creating Account..." : "Sign Up"}
+          </Button>
+        </form>
+
+        <div className="mt-6 text-center text-sm text-neutral-dark-gray">
+          Already have an account?{" "}
+          <Link href="/login" className="text-acron-primary_accent hover:text-white transition">
+            Sign in
+          </Link>
+        </div>
+      </Card>
     </div>
   );
 }

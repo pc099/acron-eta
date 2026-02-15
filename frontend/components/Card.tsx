@@ -13,8 +13,8 @@ export function Card({
     <div
       className={`p-6 rounded-card border transition ${
         highlight
-          ? "border-asahi-orange bg-asahi-orange-very-light"
-          : "border-neutral-border bg-neutral-white hover:border-asahi-orange"
+          ? "border-acron-primary_accent bg-neutral-light-gray/50"
+          : "border-neutral-border bg-neutral-dark hover:border-acron-primary_accent/50"
       } ${className}`}
     >
       {children}
@@ -37,12 +37,12 @@ export function FeatureCard({
     <Card highlight={highlight}>
       <div
         className={`w-12 h-12 rounded-card flex items-center justify-center mb-4 text-xl ${
-          highlight ? "bg-asahi-orange text-white" : "bg-neutral-light-gray text-asahi-orange"
+          highlight ? "bg-acron-primary_accent text-white" : "bg-neutral-light-gray text-acron-primary_accent"
         }`}
       >
         {icon}
       </div>
-      <h3 className="text-lg font-bold text-neutral-dark mb-2">{title}</h3>
+      <h3 className="text-lg font-bold text-white mb-2">{title}</h3>
       <p className="text-neutral-dark-gray text-sm leading-relaxed">{description}</p>
     </Card>
   );

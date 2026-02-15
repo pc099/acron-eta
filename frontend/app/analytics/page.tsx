@@ -17,7 +17,7 @@ import {
   Legend,
 } from "recharts";
 
-const ORANGE = "#FF6B35";
+const ACRON_PRIMARY = "#FF6B35";
 
 export default function AnalyticsPage() {
   const [period, setPeriod] = useState("day");
@@ -68,7 +68,7 @@ export default function AnalyticsPage() {
     return (
       <DashboardLayout title="Analytics" subtitle="Loading…">
         <div className="animate-pulse space-y-6">
-          <div className="h-64 bg-neutral-border rounded-card" />
+          <div className="h-64 bg-neutral-light-gray rounded-card" />
         </div>
       </DashboardLayout>
     );
@@ -77,7 +77,7 @@ export default function AnalyticsPage() {
   if (error) {
     return (
       <DashboardLayout title="Analytics" subtitle="">
-        <Card className="border-semantic-error bg-red-50">
+        <Card className="border-semantic-error bg-red-900/20">
           <p className="text-semantic-error">{error}</p>
         </Card>
       </DashboardLayout>
@@ -96,8 +96,8 @@ export default function AnalyticsPage() {
             onClick={() => setPeriod(p)}
             className={`px-4 py-2 rounded-button text-sm font-medium transition ${
               period === p
-                ? "bg-asahi-orange text-white"
-                : "bg-neutral-light-gray text-neutral-dark-gray hover:bg-neutral-border"
+                ? "bg-acron-primary_accent text-white"
+                : "bg-neutral-light-gray text-neutral-dark-gray hover:bg-neutral-border hover:text-white"
             }`}
           >
             {p === "day" ? "24h" : p === "week" ? "7d" : "30d"}
@@ -106,17 +106,17 @@ export default function AnalyticsPage() {
       </div>
 
       <Card className="mb-8">
-        <h3 className="text-lg font-bold text-neutral-dark mb-4">Cost by Model</h3>
+        <h3 className="text-lg font-bold text-white mb-4">Cost by Model</h3>
         <div className="h-64">
           {breakdownArray.length > 0 ? (
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={breakdownArray} margin={{ top: 8, right: 8, left: 8, bottom: 8 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#E0E0E0" />
-                <XAxis dataKey="model" tick={{ fontSize: 12 }} />
-                <YAxis tick={{ fontSize: 12 }} />
-                <Tooltip />
+                <CartesianGrid strokeDasharray="3 3" stroke="#333" />
+                <XAxis dataKey="model" tick={{ fontSize: 12, fill: '#888' }} />
+                <YAxis tick={{ fontSize: 12, fill: '#888' }} />
+                <Tooltip contentStyle={{ backgroundColor: '#000', borderColor: '#333', color: '#fff' }} />
                 <Legend />
-                <Bar dataKey="cost" fill={ORANGE} name="Cost" />
+                <Bar dataKey="cost" fill={ACRON_PRIMARY} name="Cost" />
               </BarChart>
             </ResponsiveContainer>
           ) : (
@@ -128,16 +128,16 @@ export default function AnalyticsPage() {
       </Card>
 
       <Card className="mb-8">
-        <h3 className="text-lg font-bold text-neutral-dark mb-4">Cost Trend</h3>
+        <h3 className="text-lg font-bold text-white mb-4">Cost Trend</h3>
         <div className="h-64">
           {trendArray.length > 0 ? (
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={trendArray}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#E0E0E0" />
-                <XAxis dataKey="interval" tick={{ fontSize: 12 }} />
-                <YAxis tick={{ fontSize: 12 }} />
-                <Tooltip />
-                <Line type="monotone" dataKey="value" stroke={ORANGE} strokeWidth={2} name="Cost" />
+                <CartesianGrid strokeDasharray="3 3" stroke="#333" />
+                <XAxis dataKey="interval" tick={{ fontSize: 12, fill: '#888' }} />
+                <YAxis tick={{ fontSize: 12, fill: '#888' }} />
+                <Tooltip contentStyle={{ backgroundColor: '#000', borderColor: '#333', color: '#fff' }} />
+                <Line type="monotone" dataKey="value" stroke={ACRON_PRIMARY} strokeWidth={2} name="Cost" />
               </LineChart>
             </ResponsiveContainer>
           ) : (
@@ -149,7 +149,7 @@ export default function AnalyticsPage() {
       </Card>
 
       <Card>
-        <h3 className="text-lg font-bold text-neutral-dark mb-4">Top Insights</h3>
+        <h3 className="text-lg font-bold text-white mb-4">Top Insights</h3>
         <ul className="space-y-2 text-neutral-dark-gray">
           <li>Total cost (period): ${typeof summary?.total_cost === "number" ? summary.total_cost.toFixed(2) : "—"}</li>
           <li>Total requests: {String(summary?.total_requests ?? "—")}</li>

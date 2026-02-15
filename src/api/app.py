@@ -487,6 +487,8 @@ def create_app(use_mock: bool = False) -> FastAPI:
         )
 
     # -- Routes --
+    from src.api.auth import auth_router
+    app.include_router(auth_router)
 
     def _require_scope(request: Request, allowed: List[str]) -> None:
         """Raise 403 if the key has scopes and none of allowed are present (Step 6 RBAC)."""

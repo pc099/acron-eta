@@ -3,7 +3,7 @@
 import { InputHTMLAttributes, TextareaHTMLAttributes } from "react";
 
 const inputClass =
-  "w-full px-4 py-3 border border-neutral-border rounded-card focus:border-asahi-orange focus:ring-2 focus:ring-asahi-orange-very-light outline-none transition";
+  "w-full px-4 py-3 bg-neutral-dark border border-neutral-border rounded-card text-white placeholder-neutral-dark-gray focus:border-acron-primary_accent focus:ring-2 focus:ring-acron-primary_accent/20 outline-none transition";
 
 export function Input({
   label,
@@ -14,7 +14,7 @@ export function Input({
   return (
     <div className="mb-4">
       {label && (
-        <label className="block text-sm font-medium text-neutral-dark mb-2">{label}</label>
+        <label className="block text-sm font-medium text-white mb-2">{label}</label>
       )}
       <input placeholder={placeholder} className={`${inputClass} ${className}`} {...props} />
     </div>

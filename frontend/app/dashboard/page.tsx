@@ -23,7 +23,8 @@ import {
   Legend,
 } from "recharts";
 
-const ORANGE = "#FF6B35";
+const ACRON_PRIMARY = "#FF6B35"; // Keeping accent color for charts
+const ORANGE = "#FF6B35"; // This constant is still used for pie chart, keeping it for now.
 
 export default function DashboardPage() {
   const [metrics, setMetrics] = useState<Record<string, unknown> | null>(null);
@@ -116,7 +117,7 @@ export default function DashboardPage() {
   return (
     <DashboardLayout
       title="Dashboard"
-      subtitle="Monitor your ASAHI optimization metrics"
+      subtitle="Monitor your ACRON optimization metrics"
     >
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         <MetricCard
@@ -141,16 +142,16 @@ export default function DashboardPage() {
 
       <div className="grid md:grid-cols-2 gap-6 mb-8">
         <Card>
-          <h3 className="text-lg font-bold text-neutral-dark mb-4">Cache Hit Rate</h3>
+          <h3 className="text-lg font-bold text-white mb-4">Cache Hit Rate</h3>
           <div className="h-64">
             {lineData.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={lineData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#E0E0E0" />
-                  <XAxis dataKey="time" tick={{ fontSize: 12 }} />
-                  <YAxis tick={{ fontSize: 12 }} />
-                  <Tooltip />
-                  <Line type="monotone" dataKey="cost" stroke={ORANGE} strokeWidth={2} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="#333" />
+                  <XAxis dataKey="time" tick={{ fontSize: 12, fill: '#888' }} />
+                  <YAxis tick={{ fontSize: 12, fill: '#888' }} />
+                  <Tooltip contentStyle={{ backgroundColor: '#000', borderColor: '#333' }} />
+                  <Line type="monotone" dataKey="cost" stroke={ACRON_PRIMARY} strokeWidth={2} dot={false} />
                 </LineChart>
               </ResponsiveContainer>
             ) : (

@@ -6,10 +6,10 @@ type Variant = "primary" | "secondary" | "outline" | "ghost";
 type Size = "sm" | "md" | "lg";
 
 const variants: Record<Variant, string> = {
-  primary: "bg-asahi-orange text-white hover:bg-[#E55A24]",
-  secondary: "bg-neutral-light-gray text-neutral-dark hover:bg-neutral-border",
-  outline: "border-2 border-asahi-orange text-asahi-orange hover:bg-asahi-orange-very-light",
-  ghost: "text-asahi-orange hover:bg-asahi-orange-very-light",
+  primary: "bg-acron-primary_accent text-white hover:bg-[#E55A24]",
+  secondary: "bg-neutral-light-gray text-white hover:bg-neutral-border",
+  outline: "border-2 border-acron-primary_accent text-acron-primary_accent hover:bg-neutral-light-gray",
+  ghost: "text-acron-primary_accent hover:bg-neutral-light-gray",
 };
 
 const sizes: Record<Size, string> = {

@@ -34,7 +34,7 @@ export default function InferencePage() {
         quality_threshold: qualityThreshold,
         latency_budget_ms: latencyBudget,
       });
-      setResult(res);
+      setResult(res as InferResponse);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Inference failed.");
     } finally {
@@ -54,16 +54,16 @@ export default function InferencePage() {
       subtitle="Run and monitor inference requests"
     >
       <Card className="mb-6">
-        <h3 className="text-lg font-bold text-neutral-dark mb-4">Routing Mode</h3>
+        <h3 className="text-lg font-bold text-white mb-4">Routing Mode</h3>
         <div className="flex flex-wrap gap-6">
           {(["autopilot", "guided", "explicit"] as const).map((mode) => (
-            <label key={mode} className="flex items-center gap-2 cursor-pointer">
+            <label key={mode} className="flex items-center gap-2 cursor-pointer text-white">
               <input
                 type="radio"
                 name="routing"
                 checked={routingMode === mode}
                 onChange={() => setRoutingMode(mode)}
-                className="text-asahi-orange focus:ring-asahi-orange"
+                className="text-acron-primary_accent focus:ring-acron-primary_accent"
               />
               <span className="font-medium capitalize">{mode}</span>
             </label>
@@ -78,7 +78,7 @@ export default function InferencePage() {
       </Card>
 
       <Card className="mb-6">
-        <h3 className="text-lg font-bold text-neutral-dark mb-4">Prompt</h3>
+        <h3 className="text-lg font-bold text-white mb-4">Prompt</h3>
         <TextArea
           label=""
           placeholder="Enter your prompt here..."
@@ -86,6 +86,7 @@ export default function InferencePage() {
           onChange={(e) => setPrompt(e.target.value)}
           maxLength={5000}
           rows={5}
+          className="bg-neutral-dark border-neutral-border text-white placeholder-neutral-dark-gray focus:border-acron-primary_accent"
         />
       </Card>
 
@@ -93,7 +94,7 @@ export default function InferencePage() {
         <button
           type="button"
           onClick={() => setAdvancedOpen(!advancedOpen)}
-          className="flex items-center gap-2 text-neutral-dark font-medium"
+          className="flex items-center gap-2 text-white font-medium hover:text-neutral-dark-gray transition"
         >
           {advancedOpen ? "▼" : "▶"} Advanced Options
         </button>
@@ -111,7 +112,7 @@ export default function InferencePage() {
                   step={0.1}
                   value={qualityThreshold}
                   onChange={(e) => setQualityThreshold(Number(e.target.value))}
-                  className="w-full px-3 py-2 border border-neutral-border rounded-card"
+                  className="w-full px-3 py-2 bg-neutral-dark border border-neutral-border rounded-card text-white focus:outline-none focus:border-acron-primary_accent"
                 />
               </div>
               <div>
@@ -123,7 +124,7 @@ export default function InferencePage() {
                   min={100}
                   value={latencyBudget}
                   onChange={(e) => setLatencyBudget(Number(e.target.value))}
-                  className="w-full px-3 py-2 border border-neutral-border rounded-card"
+                  className="w-full px-3 py-2 bg-neutral-dark border border-neutral-border rounded-card text-white focus:outline-none focus:border-acron-primary_accent"
                 />
               </div>
             </div>
@@ -132,7 +133,7 @@ export default function InferencePage() {
       </div>
 
       <div className="flex gap-4 mb-8">
-        <Button variant="secondary" onClick={handleClear}>
+        <Button variant="secondary" onClick={handleClear} className="bg-neutral-light-gray text-white hover:bg-neutral-border">
           Clear
         </Button>
         <Button variant="primary" onClick={handleRun} disabled={loading}>
@@ -141,14 +142,14 @@ export default function InferencePage() {
       </div>
 
       {error && (
-        <Card className="mb-6 border-semantic-error bg-red-50">
+        <Card className="mb-6 border-semantic-error bg-red-900/20">
           <p className="text-semantic-error">{error}</p>
         </Card>
       )}
 
       {result && (
         <Card>
-          <h3 className="text-lg font-bold text-neutral-dark mb-4">Response</h3>
+          <h3 className="text-lg font-bold text-white mb-4">Response</h3>
           <div className="space-y-2 text-sm text-neutral-dark-gray mb-4">
             <p><strong>Model:</strong> {result.model_used}</p>
             <p><strong>Cost:</strong> ${result.cost.toFixed(4)}</p>
@@ -164,8 +165,8 @@ export default function InferencePage() {
             )}
           </div>
           <div className="border-t border-neutral-border pt-4">
-            <p className="text-sm font-medium text-neutral-dark mb-2">Response text</p>
-            <div className="p-4 bg-neutral-light-gray rounded-card whitespace-pre-wrap text-neutral-dark">
+            <p className="text-sm font-medium text-white mb-2">Response text</p>
+            <div className="p-4 bg-neutral-dark border border-neutral-border rounded-card whitespace-pre-wrap text-white">
               {result.response || "(empty)"}
             </div>
           </div>

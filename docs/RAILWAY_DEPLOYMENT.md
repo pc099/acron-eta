@@ -35,8 +35,8 @@ This guide covers deploying the Asahi API to [Railway](https://railway.app) with
 
 **Build / start behaviour:**
 
-- If you use the **Dockerfile**: Railway builds the image and runs the container. The Dockerfile uses `$PORT` (default 8000).
-- If you use **Nixpacks** (no Dockerfile): Railway uses `Procfile` or `railway.toml`; the start command runs `uvicorn` on `$PORT`.
+- If you use the **Dockerfile**: Railway builds the image and runs the container. The Dockerfile runs uvicorn via `sh -c` so `$PORT` is expanded (default 8000).
+- If you use **Nixpacks** or **railway.toml** startCommand: the command must run via a shell (e.g. `sh -c 'uvicorn ... --port $PORT'`) so Railway’s `PORT` is expanded; otherwise uvicorn receives the literal `$PORT` and fails.
 
 ---
 
@@ -73,6 +73,11 @@ Optional:
 
 - `ASAHI_API_PORT` – overridden by Railway’s `PORT` in production.
 - `ASAHI_AUTH_API_KEY_REQUIRED` – set to `true` to enforce API key auth.
+- `PINECONE_API_KEY` – for Tier 2 vector store (see [Accounts and Tokens](ACCOUNTS_AND_TOKENS.md#2-connecting-pinecone-tier-2-semantic-cache)); index name `asahi-vectors`, dimension **1024**, metric **cosine**.
+- `SENDGRID_API_KEY` – optional welcome email after signup.
+
+**Full list of accounts and tokens (OpenAI, Anthropic, Cohere, Pinecone, SendGrid, generated secrets):** see **[docs/ACCOUNTS_AND_TOKENS.md](ACCOUNTS_AND_TOKENS.md)**.  
+**Why Postgres/Redis appear empty:** Postgres gets data when users sign up or you create API keys; Redis gets data when you run inference (cache entries). See the same doc.
 
 ---
 
@@ -102,6 +107,8 @@ To require API keys for all non-health requests:
    - `https://<your-domain>/health` – should return `{"status":"healthy",...}`.
    - `https://<your-domain>/docs` – Swagger UI.
 3. Call `POST /infer` or `POST /v1/chat/completions` with your API key (if auth is enabled) and verify responses.
+
+**Full smoke-test steps and scripts:** see **[RAILWAY_BACKEND_TESTING.md](RAILWAY_BACKEND_TESTING.md)**.
 
 ---
 
