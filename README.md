@@ -1,6 +1,6 @@
 # ACRON — Inference Cost Optimizer
 
-**ACRON** (Asahi) reduces LLM inference costs by **85–97%** through intelligent routing, multi-tier caching, and workflow decomposition. It provides a REST API, OpenAI-compatible endpoint, and a full dashboard for metrics, analytics, and cache management.
+**ACRON** reduces LLM inference costs by **85–97%** through intelligent routing, multi-tier caching, and workflow decomposition. It provides a REST API, OpenAI-compatible endpoint, and a full dashboard for metrics, analytics, and cache management.
 
 ---
 
