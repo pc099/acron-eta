@@ -122,7 +122,7 @@ curl -X POST http://localhost:8000/infer \
 
 \*Or use mock mode for local testing without keys.
 
-Optional: `PINECONE_API_KEY` (Tier 2 vector store), `SENDGRID_API_KEY` (welcome email), `TECTON_API_KEY` (feature store). See [docs/ACCOUNTS_AND_TOKENS.md](docs/ACCOUNTS_AND_TOKENS.md).
+Optional: `PINECONE_API_KEY` (Tier 2 vector store), `SENDGRID_API_KEY` (welcome email), `TECTON_API_KEY` (feature store).
 
 ### Frontend
 
@@ -168,8 +168,8 @@ After login, users are redirected to **Get Started**. All dashboard data is org-
 
 ## Deployment
 
-- **Backend (Railway):** Add Redis and PostgreSQL; reference `REDIS_URL` and `DATABASE_URL` in the API service. Set LLM and Cohere keys. Use the Procfile or: `uvicorn src.api.app:create_app --factory --host 0.0.0.0 --port $PORT`. See [docs/RAILWAY_DEPLOYMENT.md](docs/RAILWAY_DEPLOYMENT.md).
-- **Frontend (Vercel):** Set root directory to `frontend`; set `NEXT_PUBLIC_API_URL` to your backend URL. See [docs/DEPLOYMENT_VERCEL_RAILWAY.md](docs/DEPLOYMENT_VERCEL_RAILWAY.md).
+- **Backend (Railway):** Add Redis and PostgreSQL; reference `REDIS_URL` and `DATABASE_URL` in the API service. Set LLM and Cohere keys. Use the Procfile or: `uvicorn src.api.app:create_app --factory --host 0.0.0.0 --port $PORT`.
+- **Frontend (Vercel):** Set root directory to `frontend`; set `NEXT_PUBLIC_API_URL` to your backend URL.
 
 ---
 
@@ -205,7 +205,6 @@ asahi/
 ├── config/
 │   ├── config.yaml         # Application settings
 │   └── models.yaml         # LLM model profiles
-├── docs/                   # Deployment, API contract, guides
 ├── main.py                 # CLI entry point
 ├── Procfile                # web: uvicorn for Railway/Heroku
 └── requirements.txt
@@ -219,21 +218,6 @@ asahi/
 pytest tests/ -v
 pytest tests/ --cov=src --cov-fail-under=90
 ```
-
----
-
-## Documentation
-
-| Doc | Description |
-|-----|-------------|
-| [API_CONTRACT.md](docs/API_CONTRACT.md) | API reference, inference, metrics, auth |
-| [QUICK_START.md](docs/QUICK_START.md) | Get API key and first request |
-| [RAILWAY_DEPLOYMENT.md](docs/RAILWAY_DEPLOYMENT.md) | Deploy backend to Railway |
-| [DEPLOYMENT_VERCEL_RAILWAY.md](docs/DEPLOYMENT_VERCEL_RAILWAY.md) | Backend + frontend deploy |
-| [ACCOUNTS_AND_TOKENS.md](docs/ACCOUNTS_AND_TOKENS.md) | API keys, Redis, Pinecone, SendGrid |
-| [LOCAL_TESTING_GUIDE.md](docs/LOCAL_TESTING_GUIDE.md) | Local run and testing |
-| [INTEGRATION_GUIDE.md](docs/INTEGRATION_GUIDE.md) | Integrating with your app |
-| [PRODUCTION_ROADMAP_DETAILED.md](docs/PRODUCTION_ROADMAP_DETAILED.md) | Production roadmap |
 
 ---
 
