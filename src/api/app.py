@@ -597,7 +597,7 @@ def create_app(use_mock: bool = False) -> FastAPI:
     )
     async def infer(body: InferRequest, request: Request) -> InferResponse:
         """Run an inference request through Asahi's optimizer."""
-        _require_scope(request, ["infer", "all"])
+        _require_scope(request, ["infer", "admin", "all"])
         optimizer: InferenceOptimizer = request.app.state.optimizer
         request_id: str = getattr(
             request.state, "request_id", uuid.uuid4().hex[:12]
@@ -761,10 +761,19 @@ def create_app(use_mock: bool = False) -> FastAPI:
                 "requests": 0,
                 "avg_latency_ms": 0.0,
                 "cache_hit_rate": 0.0,
+                "cache_cost_saved": 0.0,
+                "cache_size": 0,
                 "cost_by_model": {},
                 "requests_by_model": {},
                 "estimated_savings_vs_gpt4": 0.0,
                 "absolute_savings": 0.0,
+                "tier1_hits": 0,
+                "tier1_misses": 0,
+                "tier2_hits": 0,
+                "tier2_misses": 0,
+                "tier3_hits": 0,
+                "tier3_misses": 0,
+                "uptime_seconds": round(time.time() - request.app.state.start_time, 1),
             }
         return optimizer.get_metrics(org_id=org_id)
 

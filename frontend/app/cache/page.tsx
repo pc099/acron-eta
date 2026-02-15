@@ -93,7 +93,7 @@ export default function CachePage() {
         <MetricCard value={tier2Hits} label="Tier 2 Hits" unit={` (${totalHits ? Math.round((tier2Hits / totalHits) * 100) : 0}%)`} />
         <MetricCard value={tier3Hits} label="Tier 3 Hits" unit={` (${totalHits ? Math.round((tier3Hits / totalHits) * 100) : 0}%)`} />
         <MetricCard value={hitRate} label="Hit Rate (All Tiers)" unit="%" highlight />
-        <MetricCard value="—" label="Storage Used" unit="" />
+        <MetricCard value={cacheSize > 0 ? cacheSize : "—"} label="Storage Used" unit={cacheSize > 0 ? " entries" : ""} />
       </div>
 
       <Card className="mb-8">
@@ -125,18 +125,26 @@ export default function CachePage() {
               </tr>
             </thead>
             <tbody>
-              {inferences.slice(0, 10).map((inf, i) => (
-                <tr key={i} className="border-b border-neutral-border text-white">
-                  <td className="py-2 pr-4">
-                    {inf.timestamp
-                      ? new Date(String(inf.timestamp)).toLocaleTimeString()
-                      : "—"}
+              {inferences.length === 0 ? (
+                <tr>
+                  <td colSpan={4} className="py-8 text-center text-neutral-dark-gray">
+                    No recent cache activity. Run inference to see requests and cache hits here.
                   </td>
-                  <td className="py-2 pr-4">{String(inf.model_used || "—")}</td>
-                  <td className="py-2 pr-4">${typeof inf.cost === "number" ? inf.cost.toFixed(4) : "—"}</td>
-                  <td className="py-2 pr-4">{inf.cache_hit ? "✓" : "✗"}</td>
                 </tr>
-              ))}
+              ) : (
+                inferences.slice(0, 10).map((inf, i) => (
+                  <tr key={i} className="border-b border-neutral-border text-white">
+                    <td className="py-2 pr-4">
+                      {inf.timestamp
+                        ? new Date(String(inf.timestamp)).toLocaleTimeString()
+                        : "—"}
+                    </td>
+                    <td className="py-2 pr-4">{String(inf.model_used || "—")}</td>
+                    <td className="py-2 pr-4">${typeof inf.cost === "number" ? inf.cost.toFixed(4) : "—"}</td>
+                    <td className="py-2 pr-4">{inf.cache_hit ? "✓" : "✗"}</td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>

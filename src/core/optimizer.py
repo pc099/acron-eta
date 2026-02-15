@@ -704,8 +704,12 @@ class InferenceOptimizer:
         summary: Dict[str, Any] = dict(self._tracker.get_metrics(org_id=org_id))
         cache_stats = self._cache.stats()
         summary["cache_size"] = cache_stats.entry_count
-        summary["cache_hit_rate"] = round(cache_stats.hit_rate, 4)
-        summary["cache_cost_saved"] = cache_stats.total_cost_saved
+        # When org_id is set, keep org-scoped cache_hit_rate from tracker; otherwise use global cache stats
+        if org_id is None:
+            summary["cache_hit_rate"] = round(cache_stats.hit_rate, 4)
+            summary["cache_cost_saved"] = cache_stats.total_cost_saved
+        else:
+            summary["cache_cost_saved"] = 0.0  # tracker does not provide per-org savings
         summary["uptime_seconds"] = round(time.time() - self._start_time, 1)
         summary["tier1_hits"] = cache_stats.hits
         summary["tier1_misses"] = cache_stats.misses
