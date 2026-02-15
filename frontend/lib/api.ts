@@ -34,6 +34,22 @@ export async function signup(data: {
   });
 }
 
+/** Delete account; does not use API key (identity confirmed by email + password). */
+export async function deleteAccount(data: { email: string; password: string }) {
+  const baseUrl = getBaseUrlClient();
+  const url = `${baseUrl.replace(/\/$/, "")}/auth/delete-account`;
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!response.ok) {
+    const err = await response.text();
+    throw new Error(err || "Failed to delete account");
+  }
+  return response.json();
+}
+
 async function fetchApi(endpoint: string, options: RequestInit = {}) {
   const baseUrl = getBaseUrlClient();
   const apiKey = getApiKeyClient();

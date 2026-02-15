@@ -8,6 +8,8 @@ import { TextArea } from "@/components/Input";
 import { infer, InferResponse } from "@/lib/api";
 
 type RoutingMode = "autopilot" | "guided" | "explicit";
+const QUALITY_OPTIONS = ["low", "medium", "high", "max"] as const;
+const LATENCY_OPTIONS = ["slow", "normal", "fast", "instant"] as const;
 
 export default function InferencePage() {
   const [prompt, setPrompt] = useState("");
@@ -18,6 +20,9 @@ export default function InferencePage() {
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [qualityThreshold, setQualityThreshold] = useState(3.5);
   const [latencyBudget, setLatencyBudget] = useState(1000);
+  // Guided mode: user-overridable quality and latency preferences
+  const [qualityPreference, setQualityPreference] = useState<typeof QUALITY_OPTIONS[number]>("medium");
+  const [latencyPreference, setLatencyPreference] = useState<typeof LATENCY_OPTIONS[number]>("normal");
   // Explicit mode: user provides model and optional provider key
   const [modelOverride, setModelOverride] = useState("");
   const [providerApiKey, setProviderApiKey] = useState("");
@@ -42,8 +47,8 @@ export default function InferencePage() {
         latency_budget_ms: latencyBudget,
       };
       if (routingMode === "guided") {
-        payload.quality_preference = "medium";
-        payload.latency_preference = "medium";
+        payload.quality_preference = qualityPreference;
+        payload.latency_preference = latencyPreference;
       }
       if (routingMode === "explicit") {
         payload.model_override = modelOverride.trim();
@@ -91,6 +96,39 @@ export default function InferencePage() {
             {routingMode === "explicit" && "You specify the exact model name and optional provider API key. Use when you need a fixed model."}
           </p>
         </div>
+
+        {routingMode === "guided" && (
+          <div className="mt-4 pt-4 border-t border-neutral-border grid gap-4 md:grid-cols-2">
+            <div>
+              <label className="block text-sm font-medium text-white mb-1">Quality preference</label>
+              <select
+                value={qualityPreference}
+                onChange={(e) => setQualityPreference(e.target.value as typeof qualityPreference)}
+                className="w-full px-3 py-2 bg-neutral-dark border border-neutral-border rounded-card text-white focus:outline-none focus:border-acron-primary_accent"
+              >
+                {QUALITY_OPTIONS.map((q) => (
+                  <option key={q} value={q} className="bg-neutral-dark">
+                    {q.charAt(0).toUpperCase() + q.slice(1)}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-white mb-1">Latency preference</label>
+              <select
+                value={latencyPreference}
+                onChange={(e) => setLatencyPreference(e.target.value as typeof latencyPreference)}
+                className="w-full px-3 py-2 bg-neutral-dark border border-neutral-border rounded-card text-white focus:outline-none focus:border-acron-primary_accent"
+              >
+                {LATENCY_OPTIONS.map((l) => (
+                  <option key={l} value={l} className="bg-neutral-dark">
+                    {l.charAt(0).toUpperCase() + l.slice(1)}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+        )}
 
         {routingMode === "explicit" && (
           <div className="mt-4 pt-4 border-t border-neutral-border grid gap-4 md:grid-cols-2">

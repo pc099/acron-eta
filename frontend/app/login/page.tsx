@@ -25,7 +25,7 @@ export default function LoginPage() {
         if (typeof window !== "undefined") {
           localStorage.setItem("acron_api_key", res.api_key);
         }
-        router.push("/dashboard");
+        router.push("/getting-started");
       } else {
         setError("Login failed: No API key returned.");
       }

@@ -171,32 +171,62 @@ def create_app(use_mock: bool = False) -> FastAPI:
             exc_info=True,
         )
 
-    # -- Tier 1 cache: Redis if REDIS_URL set and reachable, else in-memory --
+    # -- Tier 1 cache: Redis if URL set and reachable, else in-memory --
+    # Prefer REDIS_URL; fall back to common alternate env names (e.g. REDIS_PRIVATE_URL, REDIS_TLS_URL, REDISCLOUD_URL)
     tier1_cache: Optional[Any] = None
     cache_backend_used = "memory"
-    redis_url = os.environ.get("REDIS_URL")
+    redis_url = (
+        os.environ.get("REDIS_URL")
+        or os.environ.get("REDIS_PRIVATE_URL")
+        or os.environ.get("REDIS_TLS_URL")
+        or os.environ.get("REDISCLOUD_URL")
+    )
     if redis_url:
+        redis_var_used = "REDIS_URL" if os.environ.get("REDIS_URL") else (
+            "REDIS_PRIVATE_URL" if os.environ.get("REDIS_PRIVATE_URL") else (
+                "REDIS_TLS_URL" if os.environ.get("REDIS_TLS_URL") else "REDISCLOUD_URL"
+            )
+        )
         try:
             tier1_cache = RedisCache(
                 redis_url=redis_url,
                 ttl_seconds=settings.cache.ttl_seconds,
             )
-            # Verify connection (ping); some hosts need rediss:// or connection fails on first use
             tier1_cache._client.ping()
-            cache_backend_used = "redis"
-            logger.info(
-                "Tier 1 cache using Redis (connected)",
-                extra={"redis_url": "***", "hint": "Keys: asahi:t1:* (entries and asahi:t1:hits/misses)"},
-            )
+            # Probe: SET/GET/DEL a test key to confirm read/write works (e.g. TLS or ACL)
+            probe_key = "asahi:probe"
+            try:
+                tier1_cache._client.set(probe_key, "1", ex=10)
+                tier1_cache._client.get(probe_key)
+                tier1_cache._client.delete(probe_key)
+                logger.info(
+                    "Tier 1 cache using Redis (connected, probe ok)",
+                    extra={
+                        "redis_var": redis_var_used,
+                        "hint": "Keys: asahi:t1:* (entries and asahi:t1:hits/misses)",
+                    },
+                )
+            except Exception as probe_exc:
+                logger.warning(
+                    "Redis ping ok but probe (SET/GET/DEL) failed: %s",
+                    str(probe_exc),
+                    extra={"redis_var": redis_var_used, "error": str(probe_exc)},
+                )
+                tier1_cache = None
+            if tier1_cache is not None:
+                cache_backend_used = "redis"
         except Exception as exc:
             logger.warning(
                 "Redis cache init or ping failed, using in-memory Tier 1: %s",
                 str(exc),
-                extra={"error": str(exc)},
+                extra={"redis_var": redis_var_used, "error": str(exc)},
             )
             tier1_cache = None
     else:
-        logger.info("REDIS_URL not set; Tier 1 cache will use in-memory backend", extra={})
+        logger.info(
+            "No Redis URL set (tried REDIS_URL, REDIS_PRIVATE_URL, REDIS_TLS_URL, REDISCLOUD_URL); Tier 1 cache will use in-memory backend",
+            extra={},
+        )
     if tier1_cache is None:
         tier1_cache = Cache(ttl_seconds=settings.cache.ttl_seconds)
         logger.info("Tier 1 cache using in-memory backend", extra={})
@@ -531,6 +561,22 @@ def create_app(use_mock: bool = False) -> FastAPI:
         """Dependency: require analytics, admin, or all scope for analytics endpoints."""
         _require_scope(request, ["analytics", "admin", "all"])
 
+    def _require_auth(request: Request) -> None:
+        """Raise 401 if the request is not authenticated (used for org-scoped metrics/analytics)."""
+        if not hasattr(request.state, "auth") or not getattr(
+            request.state.auth, "authenticated", False
+        ):
+            raise HTTPException(
+                status_code=401,
+                detail="Authentication required (API key via Authorization: Bearer or x-api-key)",
+            )
+
+    def _get_org_id(request: Request) -> Optional[str]:
+        """Return org_id from auth; never return data for other orgs when this is None."""
+        if not hasattr(request.state, "auth"):
+            return None
+        return getattr(request.state.auth, "org_id", None)
+
     @app.post(
         "/infer",
         response_model=InferResponse,
@@ -696,9 +742,22 @@ def create_app(use_mock: bool = False) -> FastAPI:
         summary="View cost, latency, and quality analytics",
     )
     async def metrics(request: Request) -> Dict[str, Any]:
-        """Return aggregated analytics for the authenticated org (or all if no auth)."""
+        """Return aggregated analytics for the authenticated org. Requires auth; no cross-org data."""
+        _require_auth(request)
+        org_id = _get_org_id(request)
         optimizer: InferenceOptimizer = request.app.state.optimizer
-        org_id = getattr(request.state.auth, "org_id", None) if hasattr(request.state, "auth") else None
+        if org_id is None:
+            return {
+                "total_cost": 0.0,
+                "gpt4_equivalent_cost": 0.0,
+                "requests": 0,
+                "avg_latency_ms": 0.0,
+                "cache_hit_rate": 0.0,
+                "cost_by_model": {},
+                "requests_by_model": {},
+                "estimated_savings_vs_gpt4": 0.0,
+                "absolute_savings": 0.0,
+            }
         return optimizer.get_metrics(org_id=org_id)
 
     @app.get(
@@ -810,9 +869,12 @@ def create_app(use_mock: bool = False) -> FastAPI:
         limit: int = 50,
         _: None = Depends(_require_analytics_scope),
     ) -> AnalyticsResponse:
-        """Return the most recent inference events for the authenticated org."""
+        """Return the most recent inference events for the authenticated org. No cross-org data."""
+        _require_auth(request)
+        org_id = _get_org_id(request)
         optimizer: InferenceOptimizer = request.app.state.optimizer
-        org_id = getattr(request.state.auth, "org_id", None) if hasattr(request.state, "auth") else None
+        if org_id is None:
+            return AnalyticsResponse(data={"inferences": [], "count": 0})
         events = optimizer.tracker.get_events(limit=min(limit, 500), org_id=org_id)
         data = [
             {
@@ -840,11 +902,23 @@ def create_app(use_mock: bool = False) -> FastAPI:
         period: str = "24h",
         _: None = Depends(_require_analytics_scope),
     ) -> AnalyticsResponse:
-        """Return cost and savings summary for the authenticated org.
-        Period is informational; metrics are since process start unless
-        analytics backend supports time windows."""
+        """Return cost and savings summary for the authenticated org. No cross-org data."""
+        _require_auth(request)
+        org_id = _get_org_id(request)
         optimizer: InferenceOptimizer = request.app.state.optimizer
-        org_id = getattr(request.state.auth, "org_id", None) if hasattr(request.state, "auth") else None
+        if org_id is None:
+            return AnalyticsResponse(
+                data={
+                    "period": period,
+                    "total_cost": 0.0,
+                    "total_requests": 0,
+                    "cache_hit_rate": 0.0,
+                    "cache_cost_saved": 0.0,
+                    "estimated_savings_vs_gpt4": 0.0,
+                    "absolute_savings": 0.0,
+                    "uptime_seconds": round(time.time() - request.app.state.start_time, 1),
+                }
+            )
         metrics = optimizer.get_metrics(org_id=org_id)
         data = {
             "period": period,

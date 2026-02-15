@@ -275,7 +275,8 @@ class AuthMiddleware:
     def authenticate(self, headers: Dict[str, str]) -> AuthResult:
         """Authenticate a request from its headers.
 
-        Expects ``Authorization: Bearer ask_...``.
+        Accepts ``Authorization: Bearer ask_...`` or ``x-api-key: ask_...``
+        (e.g. for dashboard and API docs).
 
         Args:
             headers: Request headers dict.
@@ -286,13 +287,22 @@ class AuthMiddleware:
         if not self._config.api_key_required:
             return AuthResult(authenticated=True, scopes=["*"])
 
-        auth_header = headers.get("authorization") or headers.get(
-            "Authorization", ""
+        key: Optional[str] = None
+        auth_header = (
+            headers.get("authorization")
+            or headers.get("Authorization")
+            or ""
         )
-        if not auth_header.startswith("Bearer "):
+        if auth_header.startswith("Bearer "):
+            key = auth_header[7:].strip()
+        if not key:
+            key = (
+                headers.get("x-api-key")
+                or headers.get("X-Api-Key")
+                or ""
+            ).strip()
+        if not key:
             return AuthResult(authenticated=False)
-
-        key = auth_header[7:].strip()
         return self.validate_api_key(key)
 
     # ------------------------------------------------------------------

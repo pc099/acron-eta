@@ -27,7 +27,7 @@ export default function SignupPage() {
         if (typeof window !== "undefined") {
           localStorage.setItem("acron_api_key", res.api_key);
         }
-        router.push("/dashboard");
+        router.push("/getting-started");
       } else {
         setError("Signup failed: No API key returned.");
       }
