@@ -276,17 +276,9 @@ class AuthMiddleware:
         """Authenticate a request from its headers.
 
         Accepts ``Authorization: Bearer ask_...`` or ``x-api-key: ask_...``
-        (e.g. for dashboard and API docs).
-
-        Args:
-            headers: Request headers dict.
-
-        Returns:
-            AuthResult with authentication status.
+        (e.g. for dashboard and API docs). When API key is not required,
+        still validates the key if present so org_id is set for dashboard scoping.
         """
-        if not self._config.api_key_required:
-            return AuthResult(authenticated=True, scopes=["*"])
-
         key: Optional[str] = None
         auth_header = (
             headers.get("authorization")
@@ -301,9 +293,17 @@ class AuthMiddleware:
                 or headers.get("X-Api-Key")
                 or ""
             ).strip()
-        if not key:
-            return AuthResult(authenticated=False)
-        return self.validate_api_key(key)
+
+        if key:
+            result = self.validate_api_key(key)
+            if result.authenticated:
+                return result
+            if self._config.api_key_required:
+                return result
+
+        if not self._config.api_key_required:
+            return AuthResult(authenticated=True, scopes=["*"])
+        return AuthResult(authenticated=False)
 
     # ------------------------------------------------------------------
     # Key revocation

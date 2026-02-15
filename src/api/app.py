@@ -11,6 +11,8 @@ import logging
 import os
 import time
 import uuid
+from collections import defaultdict
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
@@ -577,6 +579,12 @@ def create_app(use_mock: bool = False) -> FastAPI:
             return None
         return getattr(request.state.auth, "org_id", None)
 
+    def _period_to_since(period: str) -> datetime:
+        """Return UTC datetime for start of period (hour, day, week, month)."""
+        now = datetime.now(timezone.utc)
+        delta = {"hour": timedelta(hours=1), "day": timedelta(days=1), "week": timedelta(weeks=1), "month": timedelta(days=30)}.get(period, timedelta(days=1))
+        return now - delta
+
     @app.post(
         "/infer",
         response_model=InferResponse,
@@ -811,9 +819,24 @@ def create_app(use_mock: bool = False) -> FastAPI:
         group_by: str = "model",
         _: None = Depends(_require_analytics_scope),
     ) -> AnalyticsResponse:
-        """Return cost breakdown grouped by model, task type, or tier."""
-        engine: AnalyticsEngine = request.app.state.analytics_engine
-        data = engine.cost_breakdown(period=period, group_by=group_by)  # type: ignore[arg-type]
+        """Return cost breakdown for the authenticated org (from tracker)."""
+        _require_auth(request)
+        org_id = _get_org_id(request)
+        if org_id is None:
+            return AnalyticsResponse(data={})
+        optimizer: InferenceOptimizer = request.app.state.optimizer
+        since = _period_to_since(period)
+        events = optimizer.tracker.get_events(since=since, limit=5000, org_id=org_id)
+        breakdown: Dict[str, float] = defaultdict(float)
+        for e in events:
+            if group_by == "model":
+                key = e.model_selected or "unknown"
+            elif group_by == "task_type":
+                key = e.task_type or "unknown"
+            else:
+                key = e.model_selected or "unknown"
+            breakdown[key] += e.cost
+        data = {k: round(v, 6) for k, v in sorted(breakdown.items(), key=lambda x: x[1], reverse=True)}
         return AnalyticsResponse(data=data)
 
     @app.get(
@@ -828,10 +851,31 @@ def create_app(use_mock: bool = False) -> FastAPI:
         intervals: int = 30,
         _: None = Depends(_require_analytics_scope),
     ) -> AnalyticsResponse:
-        """Return time-series trend data for the given metric."""
-        engine: AnalyticsEngine = request.app.state.analytics_engine
-        data = engine.trend(metric=metric, period=period, intervals=intervals)
-        return AnalyticsResponse(data=data)
+        """Return time-series trend data for the authenticated org (from tracker)."""
+        _require_auth(request)
+        org_id = _get_org_id(request)
+        if org_id is None:
+            return AnalyticsResponse(data=[{"timestamp": datetime.now(timezone.utc).isoformat(), "value": 0.0}] * max(intervals, 1))
+        optimizer: InferenceOptimizer = request.app.state.optimizer
+        since = _period_to_since(period)
+        now = datetime.now(timezone.utc)
+        bucket_delta = (now - since) / max(intervals, 1)
+        events = optimizer.tracker.get_events(since=since, limit=5000, org_id=org_id)
+        result: List[Dict[str, Any]] = []
+        for i in range(intervals):
+            bucket_start = since + bucket_delta * i
+            bucket_end = bucket_start + bucket_delta
+            if metric == "cost":
+                value = sum(e.cost for e in events if bucket_start <= e.timestamp < bucket_end)
+            elif metric == "requests":
+                value = float(sum(1 for e in events if bucket_start <= e.timestamp < bucket_end))
+            elif metric == "latency":
+                bucket_events = [e for e in events if bucket_start <= e.timestamp < bucket_end]
+                value = sum(e.latency_ms for e in bucket_events) / len(bucket_events) if bucket_events else 0.0
+            else:
+                value = 0.0
+            result.append({"timestamp": bucket_start.isoformat(), "value": round(value, 6)})
+        return AnalyticsResponse(data=result)
 
     @app.get(
         "/analytics/forecast",
