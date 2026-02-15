@@ -4,14 +4,22 @@ import { useEffect, useState } from "react";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { MetricCard } from "@/components/MetricCard";
 import { Card } from "@/components/Card";
-import { getMetrics, getCachePerformance, getRecentInferences } from "@/lib/api";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
+import { getMetrics, getRecentInferences } from "@/lib/api";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  Legend,
+} from "recharts";
 
-const ORANGE = "#FF6B35";
+const ACRON_PRIMARY = "#FF6B35";
 
 export default function CachePage() {
   const [metrics, setMetrics] = useState<Record<string, unknown> | null>(null);
-  const [perf, setPerf] = useState<Record<string, unknown> | null>(null);
   const [inferences, setInferences] = useState<Array<Record<string, unknown>>>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -20,14 +28,12 @@ export default function CachePage() {
     let cancelled = false;
     async function load() {
       try {
-        const [m, p, r] = await Promise.all([
+        const [m, r] = await Promise.all([
           getMetrics(),
-          getCachePerformance().catch(() => ({ data: {} })),
           getRecentInferences(30),
         ]);
         if (cancelled) return;
         setMetrics(m);
-        setPerf(p?.data as Record<string, unknown>);
         setInferences((r?.data?.inferences as Array<Record<string, unknown>>) || []);
         setError("");
       } catch (e) {
@@ -58,7 +64,7 @@ export default function CachePage() {
         <div className="animate-pulse space-y-6">
           <div className="grid grid-cols-3 gap-4">
             {[1, 2, 3].map((i) => (
-              <div key={i} className="h-24 bg-neutral-border rounded-card" />
+              <div key={i} className="h-24 bg-neutral-light-gray rounded-card" />
             ))}
           </div>
         </div>
@@ -69,7 +75,7 @@ export default function CachePage() {
   if (error) {
     return (
       <DashboardLayout title="Cache Management" subtitle="">
-        <Card className="border-semantic-error bg-red-50">
+        <Card className="border-semantic-error bg-red-900/20">
           <p className="text-semantic-error">{error}</p>
         </Card>
       </DashboardLayout>
@@ -91,23 +97,23 @@ export default function CachePage() {
       </div>
 
       <Card className="mb-8">
-        <h3 className="text-lg font-bold text-neutral-dark mb-4">Cache Hit Rate Over Time</h3>
+        <h3 className="text-lg font-bold text-white mb-4">Cache Hit Rate Over Time</h3>
         <div className="h-64">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={barData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#E0E0E0" />
-              <XAxis dataKey="tier" />
-              <YAxis />
-              <Tooltip />
+              <CartesianGrid strokeDasharray="3 3" stroke="#333" />
+              <XAxis dataKey="tier" tick={{ fill: '#888' }} />
+              <YAxis tick={{ fill: '#888' }} />
+              <Tooltip contentStyle={{ backgroundColor: '#000', borderColor: '#333', color: '#fff' }} />
               <Legend />
-              <Bar dataKey="hits" fill={ORANGE} name="Hits" />
+              <Bar dataKey="hits" fill={ACRON_PRIMARY} name="Hits" />
             </BarChart>
           </ResponsiveContainer>
         </div>
       </Card>
 
       <Card>
-        <h3 className="text-lg font-bold text-neutral-dark mb-4">Recent Cache Activity</h3>
+        <h3 className="text-lg font-bold text-white mb-4">Recent Cache Activity</h3>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
@@ -120,7 +126,7 @@ export default function CachePage() {
             </thead>
             <tbody>
               {inferences.slice(0, 10).map((inf, i) => (
-                <tr key={i} className="border-b border-neutral-border">
+                <tr key={i} className="border-b border-neutral-border text-white">
                   <td className="py-2 pr-4">
                     {inf.timestamp
                       ? new Date(String(inf.timestamp)).toLocaleTimeString()

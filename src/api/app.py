@@ -332,12 +332,13 @@ def create_app(use_mock: bool = False) -> FastAPI:
         if database_url.startswith("postgres://"):
             database_url = "postgresql://" + database_url[11:]
         try:
-            from src.db.engine import get_engine, get_session_factory, init_db
+            from src.db.engine import get_engine, get_session_factory, init_db, init_async_engine
             from src.db.repositories import ApiKeyRepository, OrgRepository
             from src.db.key_store import DbKeyStore
 
             db_engine = get_engine(database_url)
             init_db(db_engine)
+            init_async_engine(database_url)
             db_session_factory = get_session_factory(db_engine)
             api_key_repo = ApiKeyRepository(db_session_factory)
             app.state.org_repository = OrgRepository(db_session_factory)
