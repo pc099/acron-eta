@@ -125,9 +125,14 @@ export default function DashboardPage() {
           unit={totalHits > 0 ? "%" : ""}
           highlight
         />
-        <MetricCard value={requests} label="Requests" />
         <MetricCard
-          value={typeof totalCost === "number" ? `$${totalCost.toFixed(2)}` : totalCost}
+          value={typeof requests === "number" ? requests : Number(requests) || 0}
+          label="Requests"
+        />
+        <MetricCard
+          value={
+            typeof totalCost === "number" ? `$${totalCost.toFixed(2)}` : "—"
+          }
           label="Total Cost"
           highlight
         />
@@ -217,7 +222,10 @@ export default function DashboardPage() {
                     </td>
                     <td className="py-2 pr-4">{String(inf.model_used || "—")}</td>
                     <td className="py-2 pr-4">
-                      ${typeof inf.cost === "number" ? inf.cost.toFixed(4) : inf.cost}
+                      $
+                      {typeof inf.cost === "number"
+                        ? inf.cost.toFixed(4)
+                        : String(inf.cost ?? "—")}
                     </td>
                     <td className="py-2 pr-4">
                       {inf.cache_hit ? "✓" : "✗"}
