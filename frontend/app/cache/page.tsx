@@ -73,10 +73,22 @@ export default function CachePage() {
   }
 
   if (error) {
+    const is401 = error.includes("401");
     return (
       <DashboardLayout title="Cache Management" subtitle="">
         <Card className="border-semantic-error bg-red-900/20">
           <p className="text-semantic-error">{error}</p>
+          <p className="text-sm text-neutral-dark-gray mt-2">
+            {is401
+              ? "Your session may have expired or the API key is invalid. Log in again or update your key in Settings."
+              : "Check your API base URL and API key in Settings and ensure the backend is running."}
+          </p>
+          {is401 && (
+            <p className="text-sm mt-2 flex gap-4">
+              <a href="/login" className="text-acron-primary_accent hover:underline">Log in</a>
+              <a href="/settings" className="text-acron-primary_accent hover:underline">Settings</a>
+            </p>
+          )}
         </Card>
       </DashboardLayout>
     );

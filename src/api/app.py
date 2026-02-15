@@ -395,6 +395,7 @@ def create_app(use_mock: bool = False) -> FastAPI:
                 "Database auth init failed, using in-memory auth: %s",
                 str(exc),
                 extra={"error": str(exc)},
+                exc_info=True,
             )
             app.state.auth_middleware = AuthMiddleware()
     else:

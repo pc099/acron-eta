@@ -49,7 +49,8 @@ export default function DashboardPage() {
         setError("");
       } catch (e) {
         if (!cancelled) {
-          setError(e instanceof Error ? e.message : "Failed to load");
+          const msg = e instanceof Error ? e.message : "Failed to load";
+          setError(msg);
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -106,13 +107,22 @@ export default function DashboardPage() {
   }
 
   if (error) {
+    const is401 = error.includes("401");
     return (
       <DashboardLayout title="Dashboard" subtitle="">
         <Card className="border-semantic-error bg-red-50">
           <p className="text-semantic-error">{error}</p>
           <p className="text-sm text-neutral-dark-gray mt-2">
-            Set your API base URL and API key in Settings, and ensure the backend is running.
+            {is401
+              ? "Your session may have expired or the API key is invalid. Log in again or update your key in Settings."
+              : "Set your API base URL and API key in Settings, and ensure the backend is running."}
           </p>
+          {is401 && (
+            <p className="text-sm mt-2 flex gap-4">
+              <a href="/login" className="text-acron-primary_accent hover:underline">Log in</a>
+              <a href="/settings" className="text-acron-primary_accent hover:underline">Settings</a>
+            </p>
+          )}
         </Card>
       </DashboardLayout>
     );
@@ -127,6 +137,11 @@ export default function DashboardPage() {
         <span className="w-2 h-2 rounded-full bg-emerald-500" aria-hidden />
         <span>ACRON Engine connected</span>
       </div>
+      {typeof requests === "number" && requests === 0 && (
+        <p className="text-sm text-neutral-dark-gray mb-4">
+          No data yet. Run inference requests from the <a href="/inference" className="text-acron-primary_accent hover:underline">Inference</a> page to see metrics here.
+        </p>
+      )}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         <MetricCard
           value={totalHits > 0 ? Math.round(cacheHitRate) : "—"}
