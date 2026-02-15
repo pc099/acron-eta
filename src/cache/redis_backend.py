@@ -3,7 +3,14 @@ Redis-backed Tier 1 exact-match cache for Asahi.
 
 Implements the same interface as the in-memory Cache in exact.py so the
 optimizer can use either backend. Uses REDIS_URL from environment.
-Keys: asahi:t1:{md5(query)} for entries; asahi:t1:hits, asahi:t1:misses for stats.
+
+Keys in Redis:
+  - asahi:t1:hits, asahi:t1:misses  (counters; created on first incr)
+  - asahi:t1:{key}  (entry key = org_id:md5 or md5; only created on SET after a cache miss + successful inference)
+
+So Redis will look "empty" until at least one inference request has completed
+as a cache miss and was stored. Run an inference with a new prompt (and valid
+LLM config) to populate the cache. Use SCAN 0 MATCH asahi:t1:* to list keys.
 """
 
 import hashlib
@@ -109,7 +116,10 @@ class RedisCache:
                 "Redis get failed",
                 extra={"cache_key": key, "error": str(e)},
             )
-            self._client.incr(self.MISSES_KEY)
+            try:
+                self._client.incr(self.MISSES_KEY)
+            except Exception:
+                pass
             return None
 
         if data is None:

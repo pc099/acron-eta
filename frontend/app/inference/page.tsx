@@ -18,22 +18,37 @@ export default function InferencePage() {
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [qualityThreshold, setQualityThreshold] = useState(3.5);
   const [latencyBudget, setLatencyBudget] = useState(1000);
+  // Explicit mode: user provides model and optional provider key
+  const [modelOverride, setModelOverride] = useState("");
+  const [providerApiKey, setProviderApiKey] = useState("");
 
   async function handleRun() {
     if (!prompt.trim()) {
       setError("Enter a prompt.");
       return;
     }
+    if (routingMode === "explicit" && !modelOverride.trim()) {
+      setError("In Explicit mode, enter a model name (e.g. gpt-4o, claude-3-5-sonnet).");
+      return;
+    }
     setError("");
     setResult(null);
     setLoading(true);
     try {
-      const res = await infer({
+      const payload: Parameters<typeof infer>[0] = {
         prompt: prompt.trim(),
         routing_mode: routingMode,
         quality_threshold: qualityThreshold,
         latency_budget_ms: latencyBudget,
-      });
+      };
+      if (routingMode === "guided") {
+        payload.quality_preference = "medium";
+        payload.latency_preference = "medium";
+      }
+      if (routingMode === "explicit") {
+        payload.model_override = modelOverride.trim();
+      }
+      const res = await infer(payload);
       setResult(res as InferResponse);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Inference failed.");
@@ -69,12 +84,39 @@ export default function InferencePage() {
             </label>
           ))}
         </div>
-        <p className="text-sm text-neutral-dark-gray mt-2">
-          {routingMode === "autopilot" &&
-            "Auto-detect task type and optimize cost."}
-          {routingMode === "guided" && "Set quality/latency preferences."}
-          {routingMode === "explicit" && "Use a specific model override."}
-        </p>
+        <div className="text-sm text-neutral-dark-gray mt-2 space-y-1">
+          <p>
+            {routingMode === "autopilot" && "Auto-detect task type and optimize cost. Best for most use cases."}
+            {routingMode === "guided" && "You set quality and latency preferences; ACRON picks the best model within those constraints (e.g. high quality + low latency)."}
+            {routingMode === "explicit" && "You specify the exact model name and optional provider API key. Use when you need a fixed model."}
+          </p>
+        </div>
+
+        {routingMode === "explicit" && (
+          <div className="mt-4 pt-4 border-t border-neutral-border grid gap-4 md:grid-cols-2">
+            <div>
+              <label className="block text-sm font-medium text-white mb-1">Model name (required)</label>
+              <input
+                type="text"
+                placeholder="e.g. gpt-4o, claude-3-5-sonnet"
+                value={modelOverride}
+                onChange={(e) => setModelOverride(e.target.value)}
+                className="w-full px-3 py-2 bg-neutral-dark border border-neutral-border rounded-card text-white placeholder-neutral-dark-gray focus:outline-none focus:border-acron-primary_accent"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-white mb-1">Provider API key (optional)</label>
+              <input
+                type="password"
+                placeholder="Your OpenAI/Anthropic/etc. key"
+                value={providerApiKey}
+                onChange={(e) => setProviderApiKey(e.target.value)}
+                className="w-full px-3 py-2 bg-neutral-dark border border-neutral-border rounded-card text-white placeholder-neutral-dark-gray focus:outline-none focus:border-acron-primary_accent"
+              />
+              <p className="text-xs text-neutral-dark-gray mt-1">Use your own key for this model when set.</p>
+            </div>
+          </div>
+        )}
       </Card>
 
       <Card className="mb-6">

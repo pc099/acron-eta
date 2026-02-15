@@ -171,8 +171,9 @@ def create_app(use_mock: bool = False) -> FastAPI:
             exc_info=True,
         )
 
-    # -- Tier 1 cache: Redis if REDIS_URL set, else in-memory --
+    # -- Tier 1 cache: Redis if REDIS_URL set and reachable, else in-memory --
     tier1_cache: Optional[Any] = None
+    cache_backend_used = "memory"
     redis_url = os.environ.get("REDIS_URL")
     if redis_url:
         try:
@@ -180,14 +181,26 @@ def create_app(use_mock: bool = False) -> FastAPI:
                 redis_url=redis_url,
                 ttl_seconds=settings.cache.ttl_seconds,
             )
-            logger.info("Tier 1 cache using Redis", extra={"redis_url": "***"})
+            # Verify connection (ping); some hosts need rediss:// or connection fails on first use
+            tier1_cache._client.ping()
+            cache_backend_used = "redis"
+            logger.info(
+                "Tier 1 cache using Redis (connected)",
+                extra={"redis_url": "***", "hint": "Keys: asahi:t1:* (entries and asahi:t1:hits/misses)"},
+            )
         except Exception as exc:
             logger.warning(
-                "Redis cache init failed, using in-memory Tier 1",
+                "Redis cache init or ping failed, using in-memory Tier 1: %s",
+                str(exc),
                 extra={"error": str(exc)},
             )
+            tier1_cache = None
+    else:
+        logger.info("REDIS_URL not set; Tier 1 cache will use in-memory backend", extra={})
     if tier1_cache is None:
         tier1_cache = Cache(ttl_seconds=settings.cache.ttl_seconds)
+        logger.info("Tier 1 cache using in-memory backend", extra={})
+    app.state.cache_backend = cache_backend_used
 
     # -- Step 3 (TokenOptimizer) & Step 4 (FeatureEnricher) - optional --
     token_optimizer: Optional[Any] = None
@@ -683,9 +696,10 @@ def create_app(use_mock: bool = False) -> FastAPI:
         summary="View cost, latency, and quality analytics",
     )
     async def metrics(request: Request) -> Dict[str, Any]:
-        """Return aggregated analytics for all inference events."""
+        """Return aggregated analytics for the authenticated org (or all if no auth)."""
         optimizer: InferenceOptimizer = request.app.state.optimizer
-        return optimizer.get_metrics()
+        org_id = getattr(request.state.auth, "org_id", None) if hasattr(request.state, "auth") else None
+        return optimizer.get_metrics(org_id=org_id)
 
     @app.get(
         "/models",
@@ -722,6 +736,7 @@ def create_app(use_mock: bool = False) -> FastAPI:
                 "observability": "healthy",
                 "governance": "healthy",
             },
+            cache_backend=getattr(request.app.state, "cache_backend", None),
         )
 
     # -- Analytics endpoints (Phase 6) --
@@ -795,9 +810,10 @@ def create_app(use_mock: bool = False) -> FastAPI:
         limit: int = 50,
         _: None = Depends(_require_analytics_scope),
     ) -> AnalyticsResponse:
-        """Return the most recent inference events (request_id, model_used, cost, cache_hit, etc.)."""
+        """Return the most recent inference events for the authenticated org."""
         optimizer: InferenceOptimizer = request.app.state.optimizer
-        events = optimizer.tracker.get_events(limit=min(limit, 500))
+        org_id = getattr(request.state.auth, "org_id", None) if hasattr(request.state, "auth") else None
+        events = optimizer.tracker.get_events(limit=min(limit, 500), org_id=org_id)
         data = [
             {
                 "request_id": e.request_id,
@@ -824,11 +840,12 @@ def create_app(use_mock: bool = False) -> FastAPI:
         period: str = "24h",
         _: None = Depends(_require_analytics_scope),
     ) -> AnalyticsResponse:
-        """Return cost and savings summary for the dashboard.
+        """Return cost and savings summary for the authenticated org.
         Period is informational; metrics are since process start unless
         analytics backend supports time windows."""
         optimizer: InferenceOptimizer = request.app.state.optimizer
-        metrics = optimizer.get_metrics()
+        org_id = getattr(request.state.auth, "org_id", None) if hasattr(request.state, "auth") else None
+        metrics = optimizer.get_metrics(org_id=org_id)
         data = {
             "period": period,
             "total_cost": metrics.get("total_cost", 0.0),

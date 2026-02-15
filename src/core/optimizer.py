@@ -294,6 +294,7 @@ class InferenceOptimizer:
                 routing_reason="Cache hit (Tier 1)",
                 task_type=task_id,
                 user_id=user_id,
+                organization_id=organization_id,
             )
             return result
 
@@ -340,6 +341,7 @@ class InferenceOptimizer:
                         routing_reason="Cache hit (Tier 2)",
                         task_type=detected_task,
                         user_id=user_id,
+                        organization_id=organization_id,
                     )
                     return result
             except Exception as exc:
@@ -395,6 +397,7 @@ class InferenceOptimizer:
                             routing_reason="Cache hit (Tier 3)",
                             task_type=task_id,
                             user_id=user_id,
+                            organization_id=organization_id,
                         )
                         return result
             except Exception as exc:
@@ -671,6 +674,7 @@ class InferenceOptimizer:
             routing_reason=decision.reason,
             task_type=task_id,
             user_id=user_id,
+            organization_id=organization_id,
         )
 
         # 7. RETURN
@@ -687,14 +691,17 @@ class InferenceOptimizer:
             request_id=request_id,
         )
 
-    def get_metrics(self) -> Dict[str, Any]:
+    def get_metrics(self, org_id: Optional[str] = None) -> Dict[str, Any]:
         """Return current metrics summary including cache and uptime.
+
+        Args:
+            org_id: If set, only include events for this organization.
 
         Returns:
             Dict with analytics from the tracker plus cache stats and
             per-tier hit counts (tier1_hits, tier2_hits, tier3_hits).
         """
-        summary: Dict[str, Any] = dict(self._tracker.get_metrics())
+        summary: Dict[str, Any] = dict(self._tracker.get_metrics(org_id=org_id))
         cache_stats = self._cache.stats()
         summary["cache_size"] = cache_stats.entry_count
         summary["cache_hit_rate"] = round(cache_stats.hit_rate, 4)
@@ -976,6 +983,7 @@ class InferenceOptimizer:
         routing_reason: str,
         task_type: Optional[str] = None,
         user_id: Optional[str] = None,
+        organization_id: Optional[str] = None,
     ) -> None:
         """Create and log an InferenceEvent."""
         event = InferenceEvent(
@@ -990,6 +998,7 @@ class InferenceOptimizer:
             routing_reason=routing_reason,
             task_type=task_type,
             user_id=user_id,
+            organization_id=organization_id,
         )
         self._tracker.log_event(event)
 

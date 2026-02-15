@@ -44,6 +44,7 @@ class InferenceEvent(BaseModel):
     timestamp: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc)
     )
+    organization_id: Optional[str] = None
     user_id: Optional[str] = None
     task_type: Optional[str] = None
     model_selected: str = ""
@@ -110,13 +111,17 @@ class EventTracker:
             },
         )
 
-    def get_metrics(self) -> Dict[str, Any]:
+    def get_metrics(self, org_id: Optional[str] = None) -> Dict[str, Any]:
         """Compute aggregate analytics across all tracked events.
+
+        Args:
+            org_id: If set, only include events for this organization.
 
         Returns:
             Dict containing analytics summary.
         """
-        if not self._events:
+        events = self._events if org_id is None else [e for e in self._events if e.organization_id == org_id]
+        if not events:
             return {
                 "total_cost": 0.0,
                 "gpt4_equivalent_cost": 0.0,
@@ -129,15 +134,15 @@ class EventTracker:
                 "absolute_savings": 0.0,
             }
 
-        total_cost = sum(e.cost for e in self._events)
-        requests = len(self._events)
-        avg_latency = sum(e.latency_ms for e in self._events) / requests
-        cache_hits = sum(1 for e in self._events if e.cache_hit)
+        total_cost = sum(e.cost for e in events)
+        requests = len(events)
+        avg_latency = sum(e.latency_ms for e in events) / requests
+        cache_hits = sum(1 for e in events if e.cache_hit)
         cache_hit_rate = cache_hits / requests
 
         cost_by_model: Dict[str, float] = {}
         requests_by_model: Dict[str, int] = {}
-        for event in self._events:
+        for event in events:
             model = event.model_selected or "unknown"
             cost_by_model[model] = cost_by_model.get(model, 0.0) + event.cost
             requests_by_model[model] = requests_by_model.get(model, 0) + 1
@@ -148,7 +153,7 @@ class EventTracker:
         gpt4_total = sum(
             (e.input_tokens * gpt4_input_rate + e.output_tokens * gpt4_output_rate)
             / 1000
-            for e in self._events
+            for e in events
         )
         savings = gpt4_total - total_cost if gpt4_total > 0 else 0.0
         savings_pct = (savings / gpt4_total * 100) if gpt4_total > 0 else 0.0
@@ -169,17 +174,21 @@ class EventTracker:
         self,
         since: Optional[datetime] = None,
         limit: int = 100,
+        org_id: Optional[str] = None,
     ) -> List[InferenceEvent]:
-        """Query in-memory events with optional time filter.
+        """Query in-memory events with optional time and org filter.
 
         Args:
             since: If provided, only return events after this timestamp.
             limit: Maximum number of events to return.
+            org_id: If provided, only return events for this organization.
 
         Returns:
             List of matching events, newest first, capped at ``limit``.
         """
         events = self._events
+        if org_id is not None:
+            events = [e for e in events if e.organization_id == org_id]
         if since is not None:
             events = [e for e in events if e.timestamp >= since]
         return list(reversed(events[-limit:]))

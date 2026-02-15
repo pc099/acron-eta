@@ -68,6 +68,9 @@ export async function infer(data: {
   routing_mode: string;
   quality_threshold?: number;
   latency_budget_ms?: number;
+  quality_preference?: string;
+  latency_preference?: string;
+  model_override?: string;
 }) {
   return fetchApi("/infer", {
     method: "POST",

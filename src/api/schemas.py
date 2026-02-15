@@ -121,12 +121,14 @@ class HealthResponse(BaseModel):
         version: API version string.
         uptime_seconds: Seconds since service start.
         components: Health status of sub-components.
+        cache_backend: "redis" or "memory" for Tier 1 cache.
     """
 
     status: str
     version: str
     uptime_seconds: float
     components: Dict[str, str] = {}
+    cache_backend: Optional[str] = None
 
 
 class ErrorResponse(BaseModel):

@@ -22,6 +22,12 @@ This guide covers: why Postgres and Redis start empty, how to connect Pinecone, 
 - It is **empty** until the app handles inference requests. Each cacheable request stores an entry; repeated identical prompts then hit the cache.
 - So “empty” at the beginning is also normal. Run a few inference requests (e.g. from the Inference page or `POST /infer`), then run the same prompt again — the second time should be a cache hit and Redis will hold that key.
 
+**Redis URL set but Redis still looks empty?**
+
+1. **Confirm the app is using Redis:** Call `GET /health` and check the response for `cache_backend`. If it is `"redis"`, the app connected at startup. If it is `"memory"`, Redis init or ping failed — check deploy logs for “Redis cache init or ping failed” and fix `REDIS_URL` (e.g. use `rediss://` for TLS, correct password, correct host).
+2. **Keys appear only after a cache miss + successful inference:** The app writes to Redis only when it **stores** a new result (after running the LLM). So you must run at least one **successful** inference (valid API key, prompt, and LLM provider keys set). If inference fails before the result is cached, no key is written.
+3. **Key pattern:** In Redis you should see keys like `asahi:t1:hits`, `asahi:t1:misses`, and `asahi:t1:<org_id>:<md5>` or `asahi:t1:<md5>` for each cached prompt. Use `SCAN 0 MATCH asahi:t1:*` to list them.
+
 **Summary:** Postgres fills when you sign up or create API keys; Redis fills when you run inference. Both can start empty.
 
 ---
