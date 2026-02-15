@@ -1,4 +1,6 @@
 .env
+.claude
+.cursor
 asahi/
 docs/
 __pycache__/
