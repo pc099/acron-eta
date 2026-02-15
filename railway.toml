@@ -4,6 +4,7 @@
 builder = "nixpacks"
 
 [deploy]
-startCommand = "uvicorn src.api.app:create_app --factory --host 0.0.0.0 --port $PORT"
+# Must run via shell so $PORT is expanded (Railway injects PORT at runtime).
+startCommand = "sh -c 'uvicorn src.api.app:create_app --factory --host 0.0.0.0 --port ${PORT:-8000}'"
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 3
