@@ -19,9 +19,8 @@ export default function LandingPage() {
     }
     const url = `${base.replace(/\/$/, "")}/health`;
     fetch(url, { method: "GET" })
-      .then((r) => (r.ok ? "ready" : "offline"))
-      .catch(() => "offline")
-      .then(setEngineStatus);
+      .then((r) => setEngineStatus(r.ok ? "ready" : "offline"))
+      .catch(() => setEngineStatus("offline"));
   }, []);
 
   return (
