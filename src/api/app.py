@@ -328,6 +328,9 @@ def create_app(use_mock: bool = False) -> FastAPI:
     # -- Auth: DB-backed API keys when DATABASE_URL is set (e.g. Railway) --
     database_url = os.environ.get("DATABASE_URL")
     if database_url:
+        # Railway and some providers use postgres://; SQLAlchemy/psycopg2 expect postgresql://
+        if database_url.startswith("postgres://"):
+            database_url = "postgresql://" + database_url[11:]
         try:
             from src.db.engine import get_engine, get_session_factory, init_db
             from src.db.repositories import ApiKeyRepository, OrgRepository
@@ -343,7 +346,8 @@ def create_app(use_mock: bool = False) -> FastAPI:
             logger.info("Auth using PostgreSQL API key store", extra={})
         except Exception as exc:
             logger.warning(
-                "Database auth init failed, using in-memory auth",
+                "Database auth init failed, using in-memory auth: %s",
+                str(exc),
                 extra={"error": str(exc)},
             )
             app.state.auth_middleware = AuthMiddleware()
