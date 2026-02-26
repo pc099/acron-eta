@@ -1,3 +1,19 @@
+import { clerkMiddleware } from "@clerk/nextjs/server";
+
+export default clerkMiddleware({
+  // These routes do NOT require auth
+  publicRoutes: ["/", "/sign-in(.*)", "/sign-up(.*)", "/favicon.ico"],
+});
+
+export const config = {
+  // Run Clerk middleware on all app and API routes, but skip static assets
+  matcher: [
+    "/((?!.+\\.[\\w]+$|_next).*)",
+    "/",
+    "/(api|trpc)(.*)",
+  ],
+};
+
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 
 const isPublicRoute = createRouteMatcher([
