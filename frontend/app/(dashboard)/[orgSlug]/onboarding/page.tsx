@@ -52,7 +52,7 @@ client = asahi.Client(
 )
 
 print(response.choices[0].message.content)
-print(f"Saved: ${response.asahi.savings_usd:.4f}")`,
+print(f"Saved: \${response.asahi.savings_usd:.4f}")`,
 };
 
 export default function OnboardingPage({
