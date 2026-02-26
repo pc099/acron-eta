@@ -8,6 +8,7 @@ pydantic-settings>=2.0.0,<3
 sqlalchemy[asyncio]>=2.0.0,<3
 asyncpg>=0.30.0,<1
 alembic>=1.14.0,<2
+aiosqlite>=0.20.0,<1
 
 # Redis
 redis[hiredis]>=5.0.0,<6
