@@ -4,10 +4,11 @@ Uses pydantic-settings for validation and .env file support.
 Access the singleton via get_settings().
 """
 
+import json
 from functools import lru_cache
-from typing import Optional
+from typing import Optional, Union
 
-from pydantic import model_validator
+from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -44,11 +45,30 @@ class Settings(BaseSettings):
     # Debug
     debug: bool = True
 
-    # CORS
+    # CORS — allowed origins for browser requests (e.g. frontend on Vercel).
+    # On Railway set to your frontend URL, e.g. CORS_ORIGINS=https://your-app.vercel.app
+    # Comma-separated for multiple: https://app.vercel.app,https://custom.com
     cors_origins: list[str] = [
         "http://localhost:3000",
         "http://localhost:8000",
     ]
+
+    @field_validator("cors_origins", mode="before")
+    @classmethod
+    def _parse_cors_origins(cls, v: Union[str, list[str]]) -> list[str]:
+        """Parse CORS_ORIGINS from env: JSON array or comma-separated string."""
+        if isinstance(v, list):
+            return [s.strip() for s in v if isinstance(s, str) and s.strip()]
+        s = (v or "").strip()
+        if not s:
+            return []
+        if s.startswith("["):
+            try:
+                out = json.loads(s)
+                return [x.strip() for x in out if isinstance(x, str) and x.strip()]
+            except json.JSONDecodeError:
+                pass
+        return [x.strip() for x in s.split(",") if x.strip()]
 
     # LLM Providers
     openai_api_key: Optional[str] = None
