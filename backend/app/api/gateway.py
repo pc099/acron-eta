@@ -10,6 +10,7 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
+from app.config import get_settings
 from app.core.optimizer import GatewayResult, run_inference
 from app.services.metering import is_budget_exceeded, is_rate_limited
 
@@ -94,7 +95,7 @@ async def chat_completions(body: ChatCompletionRequest, request: Request):
         latency_preference=body.latency_preference,
         model_override=body.model,
         org_id=org_id,
-        use_mock=True,
+        use_mock=get_settings().debug,
         redis=redis,
     )
 

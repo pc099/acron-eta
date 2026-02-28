@@ -7,7 +7,7 @@ import redis.asyncio as aioredis
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import admin, analytics, auth, gateway, keys, orgs
+from app.api import admin, analytics, auth, gateway, governance, keys, orgs
 from app.config import get_settings
 from app.db.engine import engine
 from app.db.models import Base
@@ -88,6 +88,7 @@ def create_app() -> FastAPI:
     app.include_router(orgs.router, prefix="/orgs", tags=["organisations"])
     app.include_router(keys.router, prefix="/keys", tags=["api-keys"])
     app.include_router(analytics.router, prefix="/analytics", tags=["analytics"])
+    app.include_router(governance.router, prefix="/governance", tags=["governance"])
     app.include_router(admin.router, prefix="/admin", tags=["admin"])
 
     @app.get("/health")

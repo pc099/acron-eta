@@ -185,6 +185,14 @@ export interface ChatCompletionResponse {
   };
 }
 
+// ── Token Getter ─────────────────────────────
+
+let _getToken: (() => Promise<string | null>) | null = null;
+
+export function setTokenGetter(fn: () => Promise<string | null>) {
+  _getToken = fn;
+}
+
 // ── API Client ───────────────────────────────
 
 async function fetchApi<T>(
@@ -198,8 +206,9 @@ async function fetchApi<T>(
     ...((options.headers as Record<string, string>) || {}),
   };
 
-  if (token) {
-    headers["Authorization"] = `Bearer ${token}`;
+  const authToken = token ?? (await _getToken?.()) ?? undefined;
+  if (authToken) {
+    headers["Authorization"] = `Bearer ${authToken}`;
   }
 
   const response = await fetch(url, { ...options, headers });
