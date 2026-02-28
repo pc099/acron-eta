@@ -14,6 +14,7 @@ from app.config import get_settings
 from app.db.engine import engine
 from app.db.models import Base
 from app.middleware.auth import AuthMiddleware
+from app.middleware.cors_preflight import CORSPreflightMiddleware
 from app.middleware.metering import MeteringMiddleware
 from app.middleware.rate_limit import RateLimitMiddleware
 
@@ -127,18 +128,30 @@ def create_app() -> FastAPI:
         redoc_url="/redoc" if settings.debug else None,
     )
 
-    # Custom middleware: last added runs first (innermost). We want CORS to run first
-    # so OPTIONS preflight gets 200 + CORS headers before Auth (which would 401 without a token).
+    # CORS: last added runs first. Preflight handles OPTIONS with 200; CORSMiddleware adds headers to other responses.
+    origins = settings.cors_origins
+    allow_credentials = True
+    if origins == ["*"]:
+        allow_credentials = False  # Browser forbids * with credentials
+        logger.warning("CORS_ORIGINS=* disables credentials; use exact origins in production")
+    logger.info("CORS allow_origins=%s allow_credentials=%s", origins, allow_credentials)
+
     app.add_middleware(MeteringMiddleware)
     app.add_middleware(RateLimitMiddleware)
     app.add_middleware(AuthMiddleware)
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=settings.cors_origins,
-        allow_credentials=True,
+        allow_origins=origins,
+        allow_credentials=allow_credentials,
         allow_methods=["*"],
         allow_headers=["*"],
         expose_headers=["*"],
+    )
+    # Handle OPTIONS with 200 + CORS headers first (avoids 400 from CORSMiddleware in some setups)
+    app.add_middleware(
+        CORSPreflightMiddleware,
+        allow_origins=origins,
+        allow_credentials=allow_credentials,
     )
 
     # Routers

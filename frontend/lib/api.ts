@@ -220,14 +220,14 @@ async function fetchApi<T>(
 
   let response: Response;
   try {
-    response = await fetch(url, { ...options, headers });
+    response = await fetch(url, { ...options, headers, credentials: "omit" });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    throw new Error(
-      msg.includes("fetch")
-        ? `Network error: cannot reach API at ${API_BASE}. Check NEXT_PUBLIC_API_URL and CORS.`
-        : msg
-    );
+    const isNetwork = msg.includes("fetch") || msg.includes("Failed to fetch") || msg.includes("Load failed");
+    const hint = isNetwork
+      ? `Cannot reach ${API_BASE}. Open ${API_BASE}/health in a new tab — if that works, add this site’s origin (see address bar) to CORS_ORIGINS on the backend.`
+      : msg;
+    throw new Error(hint);
   }
 
   if (!response.ok) {
