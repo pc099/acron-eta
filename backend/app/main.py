@@ -127,19 +127,19 @@ def create_app() -> FastAPI:
         redoc_url="/redoc" if settings.debug else None,
     )
 
-    # CORS — allow frontend origin
+    # Custom middleware: last added runs first (innermost). We want CORS to run first
+    # so OPTIONS preflight gets 200 + CORS headers before Auth (which would 401 without a token).
+    app.add_middleware(MeteringMiddleware)
+    app.add_middleware(RateLimitMiddleware)
+    app.add_middleware(AuthMiddleware)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
+        expose_headers=["*"],
     )
-
-    # Custom middleware (order matters — outermost runs first)
-    app.add_middleware(MeteringMiddleware)
-    app.add_middleware(RateLimitMiddleware)
-    app.add_middleware(AuthMiddleware)
 
     # Routers
     app.include_router(auth.router, prefix="/auth", tags=["auth"])

@@ -56,19 +56,24 @@ class Settings(BaseSettings):
     @field_validator("cors_origins", mode="before")
     @classmethod
     def _parse_cors_origins(cls, v: Union[str, list[str]]) -> list[str]:
-        """Parse CORS_ORIGINS from env: JSON array or comma-separated string."""
+        """Parse CORS_ORIGINS from env: JSON array or comma-separated string.
+        Origins are normalized (strip, no trailing slash) to match browser Origin header.
+        """
         if isinstance(v, list):
-            return [s.strip() for s in v if isinstance(s, str) and s.strip()]
-        s = (v or "").strip()
-        if not s:
-            return []
-        if s.startswith("["):
-            try:
-                out = json.loads(s)
-                return [x.strip() for x in out if isinstance(x, str) and x.strip()]
-            except json.JSONDecodeError:
-                pass
-        return [x.strip() for x in s.split(",") if x.strip()]
+            raw = [s.strip() for s in v if isinstance(s, str) and s.strip()]
+        else:
+            s = (v or "").strip()
+            if not s:
+                return []
+            if s.startswith("["):
+                try:
+                    out = json.loads(s)
+                    raw = [x.strip() for x in out if isinstance(x, str) and x.strip()]
+                except json.JSONDecodeError:
+                    raw = [x.strip() for x in s.split(",") if x.strip()]
+            else:
+                raw = [x.strip() for x in s.split(",") if x.strip()]
+        return [o.rstrip("/") for o in raw]
 
     # LLM Providers
     openai_api_key: Optional[str] = None
