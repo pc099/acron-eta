@@ -2,11 +2,12 @@
 
 import logging
 from contextlib import asynccontextmanager
-from pathlib import Path
 
 import redis.asyncio as aioredis
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import text
+from sqlalchemy.exc import ProgrammingError
 
 from app.api import admin, analytics, auth, gateway, governance, keys, orgs
 from app.config import get_settings
@@ -18,40 +19,72 @@ from app.middleware.rate_limit import RateLimitMiddleware
 
 logger = logging.getLogger(__name__)
 
+# Tables that reference users; drop in FK order so create_all can recreate with UUID.
+_USER_DEPENDENT_TABLES = (
+    "invitations",
+    "audit_logs",
+    "request_logs",
+    "api_keys",
+    "members",
+    "users",
+)
 
-def _run_alembic_upgrade() -> None:
-    """Run Alembic migrations so schema is correct (e.g. 002 fixes users.id UUID)."""
-    import subprocess
-    import sys
 
-    backend_dir = Path(__file__).resolve().parent.parent
-    alembic_ini = backend_dir / "alembic.ini"
-    if not alembic_ini.is_file():
-        return
-    try:
-        subprocess.run(
-            [sys.executable, "-m", "alembic", "upgrade", "head"],
-            cwd=str(backend_dir),
-            check=False,
-            capture_output=True,
-            timeout=60,
+def _drop_user_dependent_tables(connection) -> None:
+    """Drop tables that reference users so they can be recreated with UUID user_id."""
+    for table in _USER_DEPENDENT_TABLES:
+        connection.execute(text(f'DROP TABLE IF EXISTS "{table}" CASCADE'))
+
+
+def _check_and_fix_users_id_type(connection) -> None:
+    """If users.id is not UUID (e.g. integer), drop user-dependent tables so create_all can recreate with UUID."""
+    result = connection.execute(
+        text(
+            """
+            SELECT data_type FROM information_schema.columns
+            WHERE table_schema = 'public' AND table_name = 'users' AND column_name = 'id'
+            """
         )
-        logger.info("Alembic upgrade head completed")
-    except Exception as e:
-        logger.warning("Alembic upgrade skipped or failed: %s", e)
+    )
+    row = result.fetchone()
+    if not row or str(row[0]).lower() == "uuid":
+        return
+    logger.warning(
+        "Detected users.id as %s (expected uuid); dropping user-dependent tables so schema can be recreated.",
+        row[0],
+    )
+    _drop_user_dependent_tables(connection)
+
+
+async def _ensure_schema() -> None:
+    """Run schema fix if needed, then create_all. Retry once after dropping user tables if create_all fails with FK type mismatch."""
+    async with engine.begin() as conn:
+        await conn.run_sync(_check_and_fix_users_id_type)
+
+    try:
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+    except ProgrammingError as e:
+        msg = str(e).lower()
+        if "user_id" in msg and "incompatible types" in msg:
+            logger.warning(
+                "create_all failed (users.id type mismatch); dropping user-dependent tables and retrying: %s",
+                e,
+            )
+            async with engine.begin() as conn:
+                await conn.run_sync(_drop_user_dependent_tables)
+            async with engine.begin() as conn:
+                await conn.run_sync(Base.metadata.create_all)
+        else:
+            raise
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Startup: run migrations, create tables + connect Redis. Shutdown: cleanup."""
+    """Startup: fix schema if needed, create tables + connect Redis. Shutdown: cleanup."""
     settings = get_settings()
 
-    # Run Alembic migrations first (e.g. 002 fixes users.id from integer to UUID)
-    _run_alembic_upgrade()
-
-    # Create database tables (no-op for tables already created by migrations)
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+    await _ensure_schema()
 
     # Connect to Redis
     try:
