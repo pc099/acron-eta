@@ -50,7 +50,7 @@ class Settings(BaseSettings):
     # Comma-separated: CORS_ORIGINS=https://app.vercel.app,https://custom.com
     # JSON array: CORS_ORIGINS=["https://app.vercel.app"]
     # Stored as str so pydantic-settings doesn't JSON-decode plain comma values.
-    cors_origins: str = "http://localhost:3000,http://localhost:8000"
+    cors_origins: str = "https://asahi-git-master-chaitanya-varmas-projects.vercel.app,https://acon-eta.vercel.app/"
 
     def get_cors_origins(self) -> list[str]:
         """Parse CORS origins from string: JSON array or comma-separated."""
