@@ -2,6 +2,7 @@
 
 import logging
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 import redis.asyncio as aioredis
 from fastapi import FastAPI
@@ -18,12 +19,37 @@ from app.middleware.rate_limit import RateLimitMiddleware
 logger = logging.getLogger(__name__)
 
 
+def _run_alembic_upgrade() -> None:
+    """Run Alembic migrations so schema is correct (e.g. 002 fixes users.id UUID)."""
+    import subprocess
+    import sys
+
+    backend_dir = Path(__file__).resolve().parent.parent
+    alembic_ini = backend_dir / "alembic.ini"
+    if not alembic_ini.is_file():
+        return
+    try:
+        subprocess.run(
+            [sys.executable, "-m", "alembic", "upgrade", "head"],
+            cwd=str(backend_dir),
+            check=False,
+            capture_output=True,
+            timeout=60,
+        )
+        logger.info("Alembic upgrade head completed")
+    except Exception as e:
+        logger.warning("Alembic upgrade skipped or failed: %s", e)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Startup: create tables + connect Redis. Shutdown: cleanup."""
+    """Startup: run migrations, create tables + connect Redis. Shutdown: cleanup."""
     settings = get_settings()
 
-    # Create database tables
+    # Run Alembic migrations first (e.g. 002 fixes users.id from integer to UUID)
+    _run_alembic_upgrade()
+
+    # Create database tables (no-op for tables already created by migrations)
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 

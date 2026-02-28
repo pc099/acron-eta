@@ -64,7 +64,7 @@ class OverviewResponse(BaseModel):
 @router.get("/overview", response_model=OverviewResponse)
 async def analytics_overview(
     request: Request,
-    period: str = Query("30d", regex="^(7d|30d|90d)$"),
+    period: str = Query("30d", pattern="^(7d|30d|90d)$"),
     db: AsyncSession = Depends(get_db),
 ):
     """KPI cards: total savings, requests, cache hit rate, latency."""
@@ -176,8 +176,8 @@ async def _aggregate_period(
 @router.get("/savings")
 async def analytics_savings(
     request: Request,
-    period: str = Query("30d", regex="^(7d|30d|90d)$"),
-    granularity: str = Query("day", regex="^(hour|day)$"),
+    period: str = Query("30d", pattern="^(7d|30d|90d)$"),
+    granularity: str = Query("day", pattern="^(hour|day)$"),
     db: AsyncSession = Depends(get_db),
 ):
     """Time series of savings data for charts."""
@@ -227,7 +227,7 @@ async def analytics_savings(
 @router.get("/models")
 async def analytics_models(
     request: Request,
-    period: str = Query("30d", regex="^(7d|30d|90d)$"),
+    period: str = Query("30d", pattern="^(7d|30d|90d)$"),
     db: AsyncSession = Depends(get_db),
 ):
     """Cost breakdown by model (for pie chart)."""
@@ -270,7 +270,7 @@ async def analytics_models(
 @router.get("/cache")
 async def analytics_cache(
     request: Request,
-    period: str = Query("30d", regex="^(7d|30d|90d)$"),
+    period: str = Query("30d", pattern="^(7d|30d|90d)$"),
     db: AsyncSession = Depends(get_db),
 ):
     """Cache performance breakdown by tier."""
@@ -309,7 +309,7 @@ async def analytics_cache(
 @router.get("/latency")
 async def analytics_latency(
     request: Request,
-    period: str = Query("30d", regex="^(7d|30d|90d)$"),
+    period: str = Query("30d", pattern="^(7d|30d|90d)$"),
     db: AsyncSession = Depends(get_db),
 ):
     """p50, p90, p99 latency percentiles."""
