@@ -6,11 +6,14 @@ session factory, and provides a FastAPI app and AsyncClient for tests.
 
 import asyncio
 import os
+import uuid as _uuid
 from collections.abc import AsyncGenerator
 from typing import Any, AsyncIterator
 
 import pytest
 from httpx import AsyncClient
+from sqlalchemy import JSON, String, event
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
@@ -18,13 +21,40 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
+# Register SQLite type adapters for PostgreSQL-specific column types.
+# This lets the same ORM models work with both PostgreSQL (production)
+# and SQLite (tests) without changing model definitions.
+from sqlalchemy import TypeDecorator
+
+
+class _JSONBtoJSON(TypeDecorator):
+    """Render JSONB as plain JSON for SQLite."""
+    impl = JSON
+    cache_ok = True
+
+
+class _UUIDtoString(TypeDecorator):
+    """Render PostgreSQL UUID as CHAR(36) for SQLite."""
+    impl = String(36)
+    cache_ok = True
+
+
+# Monkey-patch the dialect adapters before any model metadata is compiled
+import sqlalchemy.dialects.sqlite.base as sqlite_dialect  # noqa: E402
+
+_orig_get_colspec = sqlite_dialect.SQLiteTypeCompiler.visit_JSONB if hasattr(sqlite_dialect.SQLiteTypeCompiler, 'visit_JSONB') else None
+
+# Add JSONB and UUID support to SQLite type compiler
+sqlite_dialect.SQLiteTypeCompiler.visit_JSONB = lambda self, type_, **kw: "JSON"
+sqlite_dialect.SQLiteTypeCompiler.visit_UUID = lambda self, type_, **kw: "CHAR(36)"
+
 # Ensure tests use SQLite instead of a real PostgreSQL instance
 os.environ.setdefault("DATABASE_URL", "sqlite+aiosqlite://")
 os.environ.setdefault("DEBUG", "true")
 
 from app.main import create_app  # noqa: E402
 from app.db import engine as db_engine  # noqa: E402
-from app.db.models import ApiKey, KeyEnvironment, Member, MemberRole, Organisation, User  # noqa: E402
+from app.db.models import AuditLog, ApiKey, Base, KeyEnvironment, Member, MemberRole, Organisation, User  # noqa: E402
 
 
 @pytest.fixture(scope="session")
@@ -45,7 +75,7 @@ async def engine() -> AsyncGenerator[AsyncEngine, None]:
         future=True,
     )
     async with test_engine.begin() as conn:
-        await conn.run_sync(Organisation.metadata.bind.metadata.create_all)  # type: ignore[attr-defined]
+        await conn.run_sync(Base.metadata.create_all)
     yield test_engine
     await test_engine.dispose()
 
@@ -87,11 +117,12 @@ async def client(app: Any) -> AsyncGenerator[AsyncClient, None]:
 async def seed_org(session_factory: async_sessionmaker[AsyncSession]) -> dict[str, Any]:
     """Create a test organisation, user, membership, and API key."""
     async with session_factory() as session:
-        user = User(email="test@example.com", name="Test User")
+        suffix = _uuid.uuid4().hex[:8]
+        user = User(email=f"test-{suffix}@example.com", name="Test User")
         session.add(user)
         await session.flush()
 
-        org = Organisation(name="Test Org", slug="test-org")
+        org = Organisation(name="Test Org", slug=f"test-org-{suffix}")
         session.add(org)
         await session.flush()
 
@@ -124,4 +155,3 @@ async def seed_org(session_factory: async_sessionmaker[AsyncSession]) -> dict[st
             "api_key": api_key,
             "raw_key": raw_key,
         }
-

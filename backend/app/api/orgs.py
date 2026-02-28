@@ -23,6 +23,7 @@ from app.db.models import (
     RequestLog,
     User,
 )
+from app.services.audit import write_audit
 
 router = APIRouter()
 
@@ -134,6 +135,15 @@ async def update_org(
 
     await db.flush()
 
+    user_id = getattr(request.state, "user_id", None)
+    await write_audit(
+        db, org_id=org.id,
+        user_id=uuid.UUID(user_id) if user_id else None,
+        action="org.updated", resource_type="organisation",
+        resource_id=str(org.id),
+        ip_address=request.client.host if request.client else None,
+    )
+
     return OrgResponse(
         id=str(org.id),
         name=org.name,
@@ -220,6 +230,15 @@ async def invite_member(
     db.add(invitation)
     await db.flush()
 
+    await write_audit(
+        db, org_id=org.id,
+        user_id=uuid.UUID(user_id) if user_id else None,
+        action="member.invited", resource_type="invitation",
+        resource_id=str(invitation.id),
+        ip_address=request.client.host if request.client else None,
+        metadata={"email": body.email, "role": body.role},
+    )
+
     return {
         "invitation_id": str(invitation.id),
         "email": body.email,
@@ -256,8 +275,19 @@ async def update_member_role(
     if not member:
         raise HTTPException(status_code=404, detail="Member not found")
 
+    old_role = member.role.value
     member.role = MemberRole(body.role)
     await db.flush()
+
+    acting_user_id = getattr(request.state, "user_id", None)
+    await write_audit(
+        db, org_id=org.id,
+        user_id=uuid.UUID(acting_user_id) if acting_user_id else None,
+        action="member.role_changed", resource_type="member",
+        resource_id=member_user_id,
+        ip_address=request.client.host if request.client else None,
+        metadata={"old_role": old_role, "new_role": body.role},
+    )
 
     return {"user_id": member_user_id, "role": body.role}
 
@@ -289,8 +319,91 @@ async def remove_member(
     if member.role == MemberRole.OWNER:
         raise HTTPException(status_code=400, detail="Cannot remove the owner")
 
+    acting_user_id = getattr(request.state, "user_id", None)
+    await write_audit(
+        db, org_id=org.id,
+        user_id=uuid.UUID(acting_user_id) if acting_user_id else None,
+        action="member.removed", resource_type="member",
+        resource_id=member_user_id,
+        ip_address=request.client.host if request.client else None,
+    )
+
     await db.delete(member)
     await db.flush()
+
+
+@router.post("/invitations/{token}/accept")
+async def accept_invitation(
+    token: str, request: Request, db: AsyncSession = Depends(get_db)
+):
+    """Accept an invitation to join an organisation. Requires JWT auth."""
+    user_id_str = getattr(request.state, "user_id", None)
+    if not user_id_str:
+        raise HTTPException(status_code=401, detail="Authentication required")
+
+    result = await db.execute(
+        select(Invitation).where(Invitation.token == token)
+    )
+    invitation = result.scalar_one_or_none()
+    if not invitation:
+        raise HTTPException(status_code=404, detail="Invitation not found")
+
+    if invitation.accepted_at is not None:
+        raise HTTPException(status_code=409, detail="Invitation already accepted")
+
+    now = datetime.now(timezone.utc)
+    if invitation.expires_at < now:
+        raise HTTPException(status_code=410, detail="Invitation has expired")
+
+    # Look up the accepting user
+    user_id = uuid.UUID(user_id_str)
+    user_result = await db.execute(select(User).where(User.id == user_id))
+    user = user_result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # Check email matches invitation
+    if user.email != invitation.email:
+        raise HTTPException(status_code=403, detail="Invitation was sent to a different email")
+
+    # Check not already a member
+    existing = await db.execute(
+        select(Member).where(
+            Member.organisation_id == invitation.organisation_id,
+            Member.user_id == user_id,
+        )
+    )
+    if existing.scalar_one_or_none():
+        raise HTTPException(status_code=409, detail="Already a member of this organisation")
+
+    # Create membership
+    member = Member(
+        organisation_id=invitation.organisation_id,
+        user_id=user_id,
+        role=invitation.role,
+    )
+    db.add(member)
+
+    # Mark invitation as accepted
+    invitation.accepted_at = now
+    await db.flush()
+
+    # Get org slug for redirect
+    org = await db.get(Organisation, invitation.organisation_id)
+
+    await write_audit(
+        db, org_id=invitation.organisation_id,
+        user_id=user_id,
+        action="member.joined", resource_type="invitation",
+        resource_id=str(invitation.id),
+        ip_address=request.client.host if request.client else None,
+    )
+
+    return {
+        "org_id": str(invitation.organisation_id),
+        "org_slug": org.slug if org else None,
+        "role": invitation.role.value,
+    }
 
 
 @router.get("/{slug}/usage", response_model=UsageResponse)

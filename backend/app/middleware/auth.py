@@ -6,7 +6,7 @@ Rules:
 3. Gateway paths (/v1/*) require API key OR JWT
 4. On success: attach org_id, user_id, org, plan, auth_type to request.state
 5. API key auth: SHA-256 hash incoming Bearer token, lookup in api_keys table
-6. JWT auth: Verify Clerk JWT, resolve user + org
+6. JWT auth: Verify Clerk JWT signature via JWKS, resolve user + org
 """
 
 import asyncio
@@ -16,6 +16,7 @@ import uuid
 from datetime import datetime, timezone
 
 import jwt
+from jwt import PyJWKClient
 from fastapi import Request
 from fastapi.responses import JSONResponse
 from sqlalchemy import select, update
@@ -28,6 +29,39 @@ from app.db.models import ApiKey, Member, Organisation, User
 
 logger = logging.getLogger(__name__)
 
+# Clerk JWKS client — cached, fetches public keys to verify JWT signatures.
+_jwks_client: PyJWKClient | None = None
+
+
+def _get_jwks_client() -> PyJWKClient | None:
+    """Lazily initialise the JWKS client from Clerk's issuer URL."""
+    global _jwks_client
+    if _jwks_client is not None:
+        return _jwks_client
+    settings = get_settings()
+    jwks_url = settings.clerk_jwks_url
+    if not jwks_url:
+        # Derive from Clerk publishable key or fall back to None
+        pk = settings.clerk_publishable_key
+        if pk:
+            # pk_test_<base64> or pk_live_<base64> — extract the frontend API domain
+            import base64
+            try:
+                # The publishable key encodes the Clerk frontend API domain
+                encoded = pk.split("_", 2)[-1]
+                # Add padding
+                padded = encoded + "=" * (-len(encoded) % 4)
+                domain = base64.b64decode(padded).decode("utf-8").rstrip("$")
+                jwks_url = f"https://{domain}/.well-known/jwks.json"
+            except Exception:
+                logger.warning("Could not derive JWKS URL from publishable key")
+                return None
+        else:
+            return None
+    _jwks_client = PyJWKClient(jwks_url, cache_keys=True, lifespan=3600)
+    logger.info("JWKS client initialised: %s", jwks_url)
+    return _jwks_client
+
 PUBLIC_PATH_PREFIXES = (
     "/health",
     "/auth/",
@@ -35,6 +69,26 @@ PUBLIC_PATH_PREFIXES = (
     "/openapi.json",
     "/redoc",
 )
+
+# Scope → allowed path prefixes. "*" scope grants full access.
+SCOPE_PATH_MAP: dict[str, list[str]] = {
+    "inference": ["/v1/"],
+    "analytics": ["/analytics/"],
+    "keys": ["/keys"],
+    "governance": ["/governance/"],
+    "admin": ["/admin/"],
+}
+
+
+def _check_scopes(scopes: list, path: str) -> bool:
+    """Return True if any scope in the list grants access to the path."""
+    if "*" in scopes:
+        return True
+    for scope in scopes:
+        prefixes = SCOPE_PATH_MAP.get(scope, [])
+        if any(path.startswith(p) for p in prefixes):
+            return True
+    return False
 
 
 class AuthMiddleware(BaseHTTPMiddleware):
@@ -94,6 +148,14 @@ class AuthMiddleware(BaseHTTPMiddleware):
                     status_code=401,
                 )
 
+            # Enforce scopes
+            key_scopes = api_key.scopes or ["*"]
+            if not _check_scopes(key_scopes, request.url.path):
+                return JSONResponse(
+                    {"error": {"code": "insufficient_scope", "message": f"API key lacks required scope for {request.url.path}"}},
+                    status_code=403,
+                )
+
             request.state.org_id = str(api_key.organisation_id)
             request.state.org = org
             request.state.api_key_id = str(api_key.id)
@@ -115,12 +177,23 @@ class AuthMiddleware(BaseHTTPMiddleware):
         token = auth_header.removeprefix("Bearer ")
 
         try:
-            # Decode JWT — in production, verify with Clerk's JWKS
-            payload = jwt.decode(
-                token,
-                options={"verify_signature": False},
-                algorithms=["RS256"],
-            )
+            jwks = _get_jwks_client()
+            if jwks:
+                signing_key = jwks.get_signing_key_from_jwt(token)
+                payload = jwt.decode(
+                    token,
+                    signing_key.key,
+                    algorithms=["RS256"],
+                    options={"verify_aud": False},
+                )
+            else:
+                # Fallback: no JWKS configured — decode without verification (dev only)
+                logger.warning("JWKS not configured — skipping JWT signature verification")
+                payload = jwt.decode(
+                    token,
+                    options={"verify_signature": False},
+                    algorithms=["RS256"],
+                )
         except jwt.PyJWTError as e:
             logger.warning("JWT verification failed: %s", e)
             return JSONResponse(

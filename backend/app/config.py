@@ -7,6 +7,7 @@ Access the singleton via get_settings().
 from functools import lru_cache
 from typing import Optional
 
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -22,6 +23,20 @@ class Settings(BaseSettings):
 
     # Database
     database_url: str = "postgresql+asyncpg://asahi:asahi_dev_password@localhost:5432/asahi"
+
+    @model_validator(mode="after")
+    def _normalize_database_url(self) -> "Settings":
+        """Ensure database_url uses the asyncpg driver.
+
+        PaaS providers (Railway, Heroku) set DATABASE_URL as
+        ``postgresql://...`` which defaults to psycopg2 in SQLAlchemy.
+        """
+        url = self.database_url
+        if url.startswith("postgres://"):
+            self.database_url = url.replace("postgres://", "postgresql+asyncpg://", 1)
+        elif url.startswith("postgresql://") and "+asyncpg" not in url:
+            self.database_url = url.replace("postgresql://", "postgresql+asyncpg://", 1)
+        return self
 
     # Redis
     redis_url: str = "redis://localhost:6379"

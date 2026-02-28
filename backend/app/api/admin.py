@@ -1,21 +1,25 @@
 """Admin routes — internal management endpoints.
 
-GET /admin/stats — System-wide stats (requires admin auth).
+GET /admin/stats — System-wide stats (requires authenticated user).
 """
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.engine import get_db
-from app.db.models import ApiKey, Organisation, RequestLog, User
+from app.db.models import ApiKey, MemberRole, Organisation, RequestLog, User
 
 router = APIRouter()
 
 
 @router.get("/stats")
-async def admin_stats(db: AsyncSession = Depends(get_db)):
-    """System-wide statistics (for internal admin dashboard)."""
+async def admin_stats(request: Request, db: AsyncSession = Depends(get_db)):
+    """System-wide statistics. Requires OWNER or ADMIN role."""
+    role = getattr(request.state, "role", None)
+    if role not in (MemberRole.OWNER, MemberRole.ADMIN):
+        raise HTTPException(status_code=403, detail="Admin access required")
+
     org_count = await db.execute(select(func.count(Organisation.id)))
     user_count = await db.execute(select(func.count(User.id)))
     key_count = await db.execute(select(func.count(ApiKey.id)))

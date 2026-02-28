@@ -18,6 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.engine import get_db
 from app.db.models import ApiKey, KeyEnvironment
+from app.services.audit import write_audit
 
 router = APIRouter()
 
@@ -128,6 +129,14 @@ async def create_key(body: KeyCreateRequest, request: Request, db: AsyncSession 
     db.add(api_key)
     await db.flush()
 
+    await write_audit(
+        db, org_id=org_id,
+        user_id=uuid.UUID(user_id) if user_id else None,
+        action="key.created", resource_type="api_key",
+        resource_id=str(api_key.id),
+        ip_address=request.client.host if request.client else None,
+    )
+
     return KeyCreateResponse(
         id=str(api_key.id),
         name=api_key.name,
@@ -190,6 +199,15 @@ async def revoke_key(key_id: str, request: Request, db: AsyncSession = Depends(g
         raise HTTPException(status_code=404, detail="API key not found")
 
     api_key.is_active = False
+
+    user_id = getattr(request.state, "user_id", None)
+    await write_audit(
+        db, org_id=org_id,
+        user_id=uuid.UUID(user_id) if user_id else None,
+        action="key.revoked", resource_type="api_key",
+        resource_id=key_id,
+        ip_address=request.client.host if request.client else None,
+    )
     await db.flush()
 
 
@@ -230,6 +248,15 @@ async def rotate_key(key_id: str, request: Request, db: AsyncSession = Depends(g
     )
     db.add(new_key)
     await db.flush()
+
+    await write_audit(
+        db, org_id=org_id,
+        user_id=uuid.UUID(user_id) if user_id else None,
+        action="key.rotated", resource_type="api_key",
+        resource_id=str(new_key.id),
+        ip_address=request.client.host if request.client else None,
+        metadata={"old_key_id": key_id},
+    )
 
     return KeyCreateResponse(
         id=str(new_key.id),

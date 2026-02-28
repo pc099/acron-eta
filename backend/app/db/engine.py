@@ -12,13 +12,11 @@ from app.config import get_settings
 
 settings = get_settings()
 
-engine = create_async_engine(
-    settings.database_url,
-    echo=settings.debug,
-    pool_size=20,
-    max_overflow=10,
-    pool_pre_ping=True,
-)
+_engine_kwargs: dict = {"echo": settings.debug}
+if settings.database_url.startswith("postgresql"):
+    _engine_kwargs.update(pool_size=20, max_overflow=10, pool_pre_ping=True)
+
+engine = create_async_engine(settings.database_url, **_engine_kwargs)
 
 async_session_factory = async_sessionmaker(
     engine,
