@@ -42,8 +42,9 @@ class Settings(BaseSettings):
     # Redis
     redis_url: str = "redis://localhost:6379"
 
-    # Debug
-    debug: bool = True
+    # Debug — when True, /v1/chat/completions returns mock LLM responses (no API keys needed).
+    # Set DEBUG=false (and OPENAI_API_KEY and/or ANTHROPIC_API_KEY) for real inference.
+    debug: bool = False
 
     # CORS — allowed origins for browser requests (e.g. frontend on Vercel).
     # Env var: CORS_ORIGINS=https://your-app.vercel.app
