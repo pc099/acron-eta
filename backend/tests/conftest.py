@@ -1,19 +1,18 @@
 """Test fixtures for ASAHI backend.
 
-Sets up an in-memory SQLite database, overrides the async engine and
-session factory, and provides a FastAPI app and AsyncClient for tests.
+Uses a temporary file-based SQLite database so all connections (across any
+event loop) see the same tables and data.
 """
 
 import asyncio
 import os
+import tempfile
 import uuid as _uuid
 from collections.abc import AsyncGenerator
 from typing import Any, AsyncIterator
 
 import pytest
 from httpx import AsyncClient
-from sqlalchemy import JSON, String, event
-from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
@@ -22,35 +21,18 @@ from sqlalchemy.ext.asyncio import (
 )
 
 # Register SQLite type adapters for PostgreSQL-specific column types.
-# This lets the same ORM models work with both PostgreSQL (production)
-# and SQLite (tests) without changing model definitions.
-from sqlalchemy import TypeDecorator
-
-
-class _JSONBtoJSON(TypeDecorator):
-    """Render JSONB as plain JSON for SQLite."""
-    impl = JSON
-    cache_ok = True
-
-
-class _UUIDtoString(TypeDecorator):
-    """Render PostgreSQL UUID as CHAR(36) for SQLite."""
-    impl = String(36)
-    cache_ok = True
-
-
-# Monkey-patch the dialect adapters before any model metadata is compiled
 import sqlalchemy.dialects.sqlite.base as sqlite_dialect  # noqa: E402
 
-_orig_get_colspec = sqlite_dialect.SQLiteTypeCompiler.visit_JSONB if hasattr(sqlite_dialect.SQLiteTypeCompiler, 'visit_JSONB') else None
-
-# Add JSONB and UUID support to SQLite type compiler
 sqlite_dialect.SQLiteTypeCompiler.visit_JSONB = lambda self, type_, **kw: "JSON"
 sqlite_dialect.SQLiteTypeCompiler.visit_UUID = lambda self, type_, **kw: "CHAR(36)"
 
-# Ensure tests use SQLite instead of a real PostgreSQL instance
-os.environ.setdefault("DATABASE_URL", "sqlite+aiosqlite://")
-os.environ.setdefault("DEBUG", "true")
+# Create a temporary file-based SQLite DB (persists across connections/event loops).
+_tmp_db = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
+_tmp_db.close()
+_TEST_DB_URL = f"sqlite+aiosqlite:///{_tmp_db.name}"
+
+os.environ["DATABASE_URL"] = _TEST_DB_URL
+os.environ.setdefault("DEBUG", "false")
 
 from app.main import create_app  # noqa: E402
 from app.db import engine as db_engine  # noqa: E402
@@ -59,25 +41,21 @@ from app.db.models import AuditLog, ApiKey, Base, KeyEnvironment, Member, Member
 
 @pytest.fixture(scope="session")
 def event_loop() -> AsyncIterator[asyncio.AbstractEventLoop]:
-  """Create a session-scoped event loop for async tests."""
-  loop = asyncio.new_event_loop()
-  try:
-      yield loop
-  finally:
-      loop.close()
+    """Create a session-scoped event loop for async tests."""
+    loop = asyncio.new_event_loop()
+    try:
+        yield loop
+    finally:
+        loop.close()
 
 
 @pytest.fixture(scope="session")
 async def engine() -> AsyncGenerator[AsyncEngine, None]:
-    """Session-scoped async SQLite engine with all tables created."""
-    test_engine = create_async_engine(
-        os.environ["DATABASE_URL"],
-        future=True,
-    )
+    """Session-scoped engine with all tables created."""
+    test_engine = db_engine.engine
     async with test_engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     yield test_engine
-    await test_engine.dispose()
 
 
 @pytest.fixture(scope="session")
@@ -92,18 +70,16 @@ async def session_factory(engine: AsyncEngine) -> async_sessionmaker[AsyncSessio
 
 @pytest.fixture(scope="session", autouse=True)
 def override_db_engine(engine: AsyncEngine, session_factory: async_sessionmaker[AsyncSession]) -> None:
-    """Override global engine and async_session_factory used by app code."""
-    db_engine.engine = engine
+    """Override global session factory used by app code."""
     db_engine.async_session_factory = session_factory
 
 
 @pytest.fixture
 async def app() -> Any:
     """FastAPI application instance for tests."""
-    app = create_app()
-    # Disable Redis for tests; rate limit middleware will log a warning but allow requests.
-    app.state.redis = None
-    return app
+    application = create_app()
+    application.state.redis = None
+    return application
 
 
 @pytest.fixture

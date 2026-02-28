@@ -38,7 +38,7 @@ async def test_keys_crud_lifecycle(
     assert created["raw_key"].startswith("asahi_")
     assert created["last_four"]
 
-    # Rotate the existing key
+    # Rotate the existing key (revokes old key, creates new one)
     rotate_resp = await client.post(
         f"/keys/{existing_id}/rotate", headers=_auth_header(raw_key)
     )
@@ -47,10 +47,14 @@ async def test_keys_crud_lifecycle(
     assert rotated["id"]
     assert rotated["raw_key"].startswith("asahi_")
 
-    # Revoke the rotated key
+    # Use the newly created key from the create step for further auth
+    # (the original raw_key was revoked by the rotation above)
+    new_raw_key = created["raw_key"]
+
+    # Revoke the rotated key using the new key for auth
     rotated_id = rotated["id"]
     delete_resp = await client.delete(
-        f"/keys/{rotated_id}", headers=_auth_header(raw_key)
+        f"/keys/{rotated_id}", headers=_auth_header(new_raw_key)
     )
     assert delete_resp.status_code == 204
 

@@ -11,7 +11,7 @@ from sqlalchemy.exc import ProgrammingError
 
 from app.api import admin, analytics, auth, gateway, governance, keys, orgs
 from app.config import get_settings
-from app.db.engine import engine
+from app.db import engine as _db_engine_mod
 from app.db.models import Base
 from app.middleware.auth import AuthMiddleware
 from app.middleware.cors_preflight import CORSPreflightMiddleware
@@ -59,11 +59,15 @@ def _check_and_fix_users_id_type(connection) -> None:
 
 async def _ensure_schema() -> None:
     """Run schema fix if needed, then create_all. Retry once after dropping user tables if create_all fails with FK type mismatch."""
-    async with engine.begin() as conn:
-        await conn.run_sync(_check_and_fix_users_id_type)
+    _engine = _db_engine_mod.engine  # Use module attribute (overridable by tests)
+
+    # PostgreSQL-specific schema migration — skip for SQLite (tests)
+    if _engine.url.drivername.startswith("postgresql"):
+        async with _engine.begin() as conn:
+            await conn.run_sync(_check_and_fix_users_id_type)
 
     try:
-        async with engine.begin() as conn:
+        async with _engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
     except ProgrammingError as e:
         msg = str(e).lower()
@@ -72,9 +76,9 @@ async def _ensure_schema() -> None:
                 "create_all failed (users.id type mismatch); dropping user-dependent tables and retrying: %s",
                 e,
             )
-            async with engine.begin() as conn:
+            async with _engine.begin() as conn:
                 await conn.run_sync(_drop_user_dependent_tables)
-            async with engine.begin() as conn:
+            async with _engine.begin() as conn:
                 await conn.run_sync(Base.metadata.create_all)
         else:
             raise
@@ -113,7 +117,7 @@ async def lifespan(app: FastAPI):
     # Shutdown
     if app.state.redis:
         await app.state.redis.close()
-    await engine.dispose()
+    await _db_engine_mod.engine.dispose()
 
 
 def create_app() -> FastAPI:
