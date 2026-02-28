@@ -177,11 +177,14 @@ def create_app() -> FastAPI:
             except Exception:
                 pass
 
+        import os
         return {
             "status": "ok",
             "version": "1.0.0",
             "redis": "connected" if redis_ok else "unavailable",
             "cors_origins": settings.get_cors_origins(),
+            "cors_origins_raw": settings.cors_origins,
+            "cors_env": os.environ.get("CORS_ORIGINS", "<NOT SET>"),
             "debug": settings.debug,
         }
 
