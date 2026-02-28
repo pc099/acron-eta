@@ -195,15 +195,22 @@ export function setTokenGetter(fn: () => Promise<string | null>) {
 
 // ── API Client ───────────────────────────────
 
+export type ApiOptions = {
+  token?: string;
+  orgSlug?: string;
+};
+
 async function fetchApi<T>(
   path: string,
   options: RequestInit = {},
-  token?: string
+  token?: string,
+  extraHeaders?: Record<string, string>
 ): Promise<T> {
   const url = `${API_BASE}${path}`;
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     ...((options.headers as Record<string, string>) || {}),
+    ...extraHeaders,
   };
 
   const authToken = token ?? (await _getToken?.()) ?? undefined;
@@ -211,14 +218,28 @@ async function fetchApi<T>(
     headers["Authorization"] = `Bearer ${authToken}`;
   }
 
-  const response = await fetch(url, { ...options, headers });
+  let response: Response;
+  try {
+    response = await fetch(url, { ...options, headers });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    throw new Error(
+      msg.includes("fetch")
+        ? `Network error: cannot reach API at ${API_BASE}. Check NEXT_PUBLIC_API_URL and CORS.`
+        : msg
+    );
+  }
 
   if (!response.ok) {
     const body = await response.text();
-    throw new Error(`API Error ${response.status}: ${body}`);
+    throw new Error(`API Error ${response.status}: ${body || response.statusText}`);
   }
 
   return response.json() as Promise<T>;
+}
+
+function orgHeaders(orgSlug?: string): Record<string, string> | undefined {
+  return orgSlug ? { "X-Org-Slug": orgSlug } : undefined;
 }
 
 // ── Auth ─────────────────────────────────────
@@ -266,29 +287,38 @@ export async function getOrgUsage(slug: string, token?: string) {
 
 // ── API Keys ─────────────────────────────────
 
-export async function listKeys(token?: string) {
-  return fetchApi<ApiKeyItem[]>("/keys", {}, token);
+export async function listKeys(token?: string, orgSlug?: string) {
+  return fetchApi<ApiKeyItem[]>("/keys", {}, token, orgHeaders(orgSlug));
 }
 
 export async function createKey(
   data: { name: string; environment?: string; scopes?: string[] },
-  token?: string
+  token?: string,
+  orgSlug?: string
 ) {
-  return fetchApi<ApiKeyCreateResponse>("/keys", {
-    method: "POST",
-    body: JSON.stringify(data),
-  }, token);
+  return fetchApi<ApiKeyCreateResponse>(
+    "/keys",
+    { method: "POST", body: JSON.stringify(data) },
+    token,
+    orgHeaders(orgSlug)
+  );
 }
 
-export async function revokeKey(keyId: string, token?: string) {
-  return fetchApi<void>(`/keys/${keyId}`, { method: "DELETE" }, token);
+export async function revokeKey(keyId: string, token?: string, orgSlug?: string) {
+  return fetchApi<void>(
+    `/keys/${keyId}`,
+    { method: "DELETE" },
+    token,
+    orgHeaders(orgSlug)
+  );
 }
 
-export async function rotateKey(keyId: string, token?: string) {
+export async function rotateKey(keyId: string, token?: string, orgSlug?: string) {
   return fetchApi<ApiKeyCreateResponse>(
     `/keys/${keyId}/rotate`,
     { method: "POST" },
-    token
+    token,
+    orgHeaders(orgSlug)
   );
 }
 
@@ -406,11 +436,13 @@ export async function chatCompletions(
     quality_preference?: string;
     latency_preference?: string;
   },
-  token?: string
+  token?: string,
+  orgSlug?: string
 ) {
   return fetchApi<ChatCompletionResponse>(
     "/v1/chat/completions",
     { method: "POST", body: JSON.stringify(data) },
-    token
+    token,
+    orgHeaders(orgSlug)
   );
 }

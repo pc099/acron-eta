@@ -203,6 +203,8 @@ class AuthMiddleware(BaseHTTPMiddleware):
 
         clerk_user_id = payload.get("sub")
         org_id = payload.get("org_id")
+        # Dashboard can send current org via header so backend uses correct org
+        org_slug = request.headers.get("X-Org-Slug", "").strip() or None
 
         if not clerk_user_id:
             return JSONResponse(
@@ -223,8 +225,35 @@ class AuthMiddleware(BaseHTTPMiddleware):
                     status_code=401,
                 )
 
+            # Prefer X-Org-Slug from dashboard, then org_id from JWT
+            if org_slug:
+                org_result = await session.execute(
+                    select(Organisation).where(Organisation.slug == org_slug)
+                )
+                org = org_result.scalar_one_or_none()
+                if not org:
+                    return JSONResponse(
+                        {"error": {"code": "org_not_found", "message": "Organisation not found"}},
+                        status_code=404,
+                    )
+                member_result = await session.execute(
+                    select(Member).where(
+                        Member.organisation_id == org.id,
+                        Member.user_id == user.id,
+                    )
+                )
+                member = member_result.scalar_one_or_none()
+                if not member:
+                    return JSONResponse(
+                        {"error": {"code": "not_member", "message": "Not a member of this organisation"}},
+                        status_code=403,
+                    )
+                request.state.org_id = str(org.id)
+                request.state.org = org
+                request.state.plan = org.plan
+                request.state.role = member.role
             # If org_id is in the JWT, verify membership
-            if org_id:
+            elif org_id:
                 org = await session.get(Organisation, uuid.UUID(org_id))
                 if not org:
                     return JSONResponse(

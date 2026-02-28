@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useParams } from "next/navigation";
 import { useMutation } from "@tanstack/react-query";
 import { chatCompletions } from "@/lib/api";
 import type { ChatCompletionResponse } from "@/lib/api";
@@ -20,6 +21,8 @@ const ROUTING_MODES = ["AUTOPILOT", "GUIDED", "EXPLICIT"] as const;
 const QUALITY_LABELS = ["economy", "balanced", "premium"] as const;
 
 export default function PlaygroundPage() {
+  const params = useParams();
+  const orgSlug = typeof params?.orgSlug === "string" ? params.orgSlug : undefined;
   const [routingMode, setRoutingMode] = useState<string>("AUTOPILOT");
   const [qualityIndex, setQualityIndex] = useState(1);
   const [message, setMessage] = useState("");
@@ -27,11 +30,15 @@ export default function PlaygroundPage() {
 
   const mutation = useMutation({
     mutationFn: (userMessage: string) =>
-      chatCompletions({
-        messages: [{ role: "user", content: userMessage }],
-        routing_mode: routingMode,
-        quality_preference: QUALITY_LABELS[qualityIndex],
-      }),
+      chatCompletions(
+        {
+          messages: [{ role: "user", content: userMessage }],
+          routing_mode: routingMode,
+          quality_preference: QUALITY_LABELS[qualityIndex],
+        },
+        undefined,
+        orgSlug
+      ),
     onSuccess: (data) => setResult(data),
   });
 
@@ -155,8 +162,11 @@ export default function PlaygroundPage() {
               </div>
             ) : mutation.isError ? (
               <div className="rounded-md border border-red-500/30 bg-red-500/10 p-4">
-                <p className="text-sm text-red-400">
-                  {mutation.error?.message || "An error occurred"}
+                <p className="text-sm font-medium text-red-400">Request failed</p>
+                <p className="mt-1 text-sm text-red-300/90 break-words">
+                  {mutation.error instanceof Error
+                    ? mutation.error.message
+                    : "An error occurred"}
                 </p>
               </div>
             ) : result ? (

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useParams } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { listKeys, createKey, revokeKey } from "@/lib/api";
 import type { ApiKeyCreateResponse } from "@/lib/api";
@@ -9,6 +10,8 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
 export default function KeysPage() {
+  const params = useParams();
+  const orgSlug = typeof params?.orgSlug === "string" ? params.orgSlug : undefined;
   const queryClient = useQueryClient();
   const [showCreate, setShowCreate] = useState(false);
   const [newKeyName, setNewKeyName] = useState("");
@@ -16,28 +19,34 @@ export default function KeysPage() {
   const [revealedKeys, setRevealedKeys] = useState<Set<string>>(new Set());
 
   const { data: keys, isLoading } = useQuery({
-    queryKey: ["keys"],
-    queryFn: () => listKeys(),
+    queryKey: ["keys", orgSlug],
+    queryFn: () => listKeys(undefined, orgSlug),
   });
 
   const createMutation = useMutation({
-    mutationFn: (name: string) => createKey({ name }),
+    mutationFn: (name: string) => createKey({ name }, undefined, orgSlug),
     onSuccess: (data) => {
       setCreatedKey(data);
       setNewKeyName("");
       queryClient.invalidateQueries({ queryKey: ["keys"] });
       toast.success("API key created");
     },
-    onError: () => toast.error("Failed to create key"),
+    onError: (err) => {
+      const msg = err instanceof Error ? err.message : "Failed to create key";
+      toast.error(msg);
+    },
   });
 
   const revokeMutation = useMutation({
-    mutationFn: (keyId: string) => revokeKey(keyId),
+    mutationFn: (keyId: string) => revokeKey(keyId, undefined, orgSlug),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["keys"] });
       toast.success("API key revoked");
     },
-    onError: () => toast.error("Failed to revoke key"),
+    onError: (err) => {
+      const msg = err instanceof Error ? err.message : "Failed to revoke key";
+      toast.error(msg);
+    },
   });
 
   const copyToClipboard = (text: string) => {
