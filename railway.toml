@@ -1,10 +1,14 @@
-# Railway deployment config (optional).
+# Railway deployment config.
 # See https://docs.railway.app/reference/config-as-code
+
 [build]
 builder = "nixpacks"
+# Install the new backend's dependencies (not the root requirements.txt)
+buildCommand = "pip install -r backend/requirements.txt"
 
 [deploy]
-# Must run via shell so $PORT is expanded (Railway injects PORT at runtime).
-startCommand = "sh -c 'uvicorn src.api.app:create_app --factory --host 0.0.0.0 --port ${PORT:-8000}'"
+# Start the NEW backend (backend/app/main.py) — NOT the old src/api/app.py.
+# backend/app/core/optimizer.py adds project root to sys.path for src/ imports.
+startCommand = "sh -c 'cd backend && uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}'"
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 3
