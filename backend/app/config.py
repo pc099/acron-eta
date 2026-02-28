@@ -8,7 +8,7 @@ import json
 from functools import lru_cache
 from typing import Optional, Union
 
-from pydantic import field_validator, model_validator
+from pydantic import model_validator, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -46,33 +46,25 @@ class Settings(BaseSettings):
     debug: bool = True
 
     # CORS — allowed origins for browser requests (e.g. frontend on Vercel).
-    # On Railway set to your frontend URL, e.g. CORS_ORIGINS=https://your-app.vercel.app
-    # Comma-separated for multiple: https://app.vercel.app,https://custom.com
-    cors_origins: list[str] = [
-        "http://localhost:3000",
-        "http://localhost:8000",
-    ]
+    # Env var: CORS_ORIGINS=https://your-app.vercel.app
+    # Comma-separated: CORS_ORIGINS=https://app.vercel.app,https://custom.com
+    # JSON array: CORS_ORIGINS=["https://app.vercel.app"]
+    # Stored as str so pydantic-settings doesn't JSON-decode plain comma values.
+    cors_origins: str = "http://localhost:3000,http://localhost:8000"
 
-    @field_validator("cors_origins", mode="before")
-    @classmethod
-    def _parse_cors_origins(cls, v: Union[str, list[str]]) -> list[str]:
-        """Parse CORS_ORIGINS from env: JSON array or comma-separated string.
-        Origins are normalized (strip, no trailing slash) to match browser Origin header.
-        """
-        if isinstance(v, list):
-            raw = [s.strip() for s in v if isinstance(s, str) and s.strip()]
+    def get_cors_origins(self) -> list[str]:
+        """Parse CORS origins from string: JSON array or comma-separated."""
+        v = self.cors_origins.strip()
+        if not v:
+            return []
+        if v.startswith("["):
+            try:
+                items = json.loads(v)
+                raw = [x.strip() for x in items if isinstance(x, str) and x.strip()]
+            except json.JSONDecodeError:
+                raw = [x.strip() for x in v.split(",") if x.strip()]
         else:
-            s = (v or "").strip()
-            if not s:
-                return []
-            if s.startswith("["):
-                try:
-                    out = json.loads(s)
-                    raw = [x.strip() for x in out if isinstance(x, str) and x.strip()]
-                except json.JSONDecodeError:
-                    raw = [x.strip() for x in s.split(",") if x.strip()]
-            else:
-                raw = [x.strip() for x in s.split(",") if x.strip()]
+            raw = [x.strip() for x in v.split(",") if x.strip()]
         return [o.rstrip("/") for o in raw]
 
     # LLM Providers

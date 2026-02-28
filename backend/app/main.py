@@ -133,7 +133,7 @@ def create_app() -> FastAPI:
     )
 
     # CORS: last added runs first. Preflight handles OPTIONS with 200; CORSMiddleware adds headers to other responses.
-    origins = settings.cors_origins
+    origins = settings.get_cors_origins()
     allow_credentials = True
     if origins == ["*"]:
         allow_credentials = False  # Browser forbids * with credentials
@@ -181,7 +181,7 @@ def create_app() -> FastAPI:
             "status": "ok",
             "version": "1.0.0",
             "redis": "connected" if redis_ok else "unavailable",
-            "cors_origins": settings.cors_origins,
+            "cors_origins": settings.get_cors_origins(),
             "debug": settings.debug,
         }
 
