@@ -181,6 +181,8 @@ def create_app() -> FastAPI:
             "status": "ok",
             "version": "1.0.0",
             "redis": "connected" if redis_ok else "unavailable",
+            "cors_origins": settings.cors_origins,
+            "debug": settings.debug,
         }
 
     return app
