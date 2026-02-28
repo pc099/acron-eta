@@ -1,5 +1,6 @@
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
+import { BootstrapError } from "./error-ui";
 
 type LoginResponse = {
   user_id: string;
@@ -36,19 +37,24 @@ export default async function BootstrapPage() {
   const fullName = user?.fullName ?? undefined;
 
   if (!primaryEmail) {
-    // Clerk account without email shouldn't happen in this app; send back to sign-in.
     redirect("/sign-in");
   }
 
   // 1. Try login by Clerk user ID
-  const loginRes = await fetch(`${API_BASE}/auth/login`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ clerk_user_id: userId }),
-    cache: "no-store",
-  });
+  let loginRes: Response;
+  try {
+    loginRes = await fetch(`${API_BASE}/auth/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ clerk_user_id: userId }),
+      cache: "no-store",
+    });
+  } catch {
+    // Backend is unreachable (not running, network error, etc.)
+    return (
+      <BootstrapError message="Cannot connect to the ASAHI backend. Make sure the backend server is running." />
+    );
+  }
 
   if (loginRes.ok) {
     const data = (await loginRes.json()) as LoginResponse;
@@ -56,31 +62,41 @@ export default async function BootstrapPage() {
     if (firstOrg) {
       redirect(`/${firstOrg.org_slug}/dashboard`);
     }
+    // User exists but has no organisations — fall through to create one
   } else if (loginRes.status !== 404) {
-    // Unexpected error from backend; fall back to landing page.
-    redirect("/");
+    const detail = await loginRes.text().catch(() => "Unknown error");
+    return (
+      <BootstrapError message={`Login failed (${loginRes.status}): ${detail}`} />
+    );
   }
 
   // 2. If login 404, this is a new user — call signup to create user + org
-  const signupRes = await fetch(`${API_BASE}/auth/signup`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      email: primaryEmail,
-      name: fullName,
-      clerk_user_id: userId,
-      org_name: fullName ? `${fullName}'s Org` : undefined,
-    }),
-    cache: "no-store",
-  });
+  let signupRes: Response;
+  try {
+    signupRes = await fetch(`${API_BASE}/auth/signup`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: primaryEmail,
+        name: fullName,
+        clerk_user_id: userId,
+        org_name: fullName ? `${fullName}'s Org` : undefined,
+      }),
+      cache: "no-store",
+    });
+  } catch {
+    return (
+      <BootstrapError message="Cannot connect to the ASAHI backend. Make sure the backend server is running." />
+    );
+  }
 
   if (!signupRes.ok) {
-    redirect("/");
+    const detail = await signupRes.text().catch(() => "Unknown error");
+    return (
+      <BootstrapError message={`Account setup failed (${signupRes.status}): ${detail}`} />
+    );
   }
 
   const created = (await signupRes.json()) as SignupResponse;
   redirect(`/${created.org_slug}/dashboard`);
 }
-

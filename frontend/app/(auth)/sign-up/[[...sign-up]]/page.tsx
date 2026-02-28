@@ -1,6 +1,14 @@
+import { auth } from "@clerk/nextjs/server";
+import { redirect } from "next/navigation";
 import { SignUp } from "@clerk/nextjs";
 
-export default function SignUpPage() {
+export default async function SignUpPage() {
+  // If the user is already authenticated, send them straight to bootstrap.
+  const { userId } = await auth();
+  if (userId) {
+    redirect("/bootstrap");
+  }
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-background">
       <SignUp
