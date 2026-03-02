@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
+import { useQuery } from "@tanstack/react-query";
 import {
   Check,
   ChevronRight,
@@ -13,6 +14,8 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { getAnalyticsOverview } from "@/lib/api";
+import { fireConfetti } from "@/lib/confetti";
 
 const steps = [
   {
@@ -61,6 +64,27 @@ export default function OnboardingPage({
   params: { orgSlug: string };
 }) {
   const [currentStep, setCurrentStep] = useState(0);
+  const prevRequests = useRef<number | null>(null);
+  const confettiFired = useRef(false);
+
+  // Poll for first request every 5s
+  const { data: overview } = useQuery({
+    queryKey: ["overview", params.orgSlug, "onboarding"],
+    queryFn: () => getAnalyticsOverview("30d"),
+    refetchInterval: 5_000,
+  });
+
+  // Fire confetti when requests go from 0 to >0
+  useEffect(() => {
+    if (!overview || confettiFired.current) return;
+    const total = overview.total_requests;
+    if (prevRequests.current !== null && prevRequests.current === 0 && total > 0) {
+      confettiFired.current = true;
+      fireConfetti();
+      toast.success("Your first request went through! Welcome to ASAHI.");
+    }
+    prevRequests.current = total;
+  }, [overview]);
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);

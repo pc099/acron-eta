@@ -6,14 +6,17 @@ Rules:
 3. Gateway paths (/v1/*) require API key OR JWT
 4. On success: attach org_id, user_id, org, plan, auth_type to request.state
 5. API key auth: SHA-256 hash incoming Bearer token, lookup in api_keys table
+   — with Redis cache (5min TTL) to avoid DB hit per request
 6. JWT auth: Verify Clerk JWT signature via JWKS, resolve user + org
 """
 
 import asyncio
 import hashlib
+import json
 import logging
 import uuid
 from datetime import datetime, timezone
+from typing import Any, Optional
 
 import jwt
 from jwt import PyJWKClient
@@ -28,6 +31,52 @@ from app.db.engine import async_session_factory
 from app.db.models import ApiKey, Member, Organisation, User
 
 logger = logging.getLogger(__name__)
+
+_AUTH_CACHE_TTL = 300  # 5 minutes
+_AUTH_CACHE_PREFIX = "asahi:auth:key:"
+
+
+class _CachedOrg:
+    """Lightweight org stand-in populated from Redis cache.
+
+    Provides the same attributes that gateway.py accesses on request.state.org
+    (monthly_request_limit, monthly_budget_usd, plan) without loading a full
+    SQLAlchemy model.
+    """
+
+    def __init__(self, data: dict[str, Any]) -> None:
+        self.id = uuid.UUID(data["org_id"])
+        self.plan = data.get("plan")
+        self.monthly_request_limit = data.get("monthly_request_limit", 10_000)
+        self.monthly_budget_usd = data.get("monthly_budget_usd")
+
+
+async def _get_cached_auth(redis: Any, key_hash: str) -> Optional[dict[str, Any]]:
+    """Try to load API key auth data from Redis cache."""
+    if not redis:
+        return None
+    try:
+        cached = await redis.get(f"{_AUTH_CACHE_PREFIX}{key_hash}")
+        if cached:
+            return json.loads(cached)
+    except Exception:
+        logger.debug("Redis auth cache read failed for key %s...", key_hash[:8])
+    return None
+
+
+async def _set_cached_auth(redis: Any, key_hash: str, data: dict[str, Any]) -> None:
+    """Store API key auth data in Redis cache."""
+    if not redis:
+        return
+    try:
+        await redis.set(
+            f"{_AUTH_CACHE_PREFIX}{key_hash}",
+            json.dumps(data),
+            ex=_AUTH_CACHE_TTL,
+        )
+    except Exception:
+        logger.debug("Redis auth cache write failed for key %s...", key_hash[:8])
+
 
 # Clerk JWKS client — cached, fetches public keys to verify JWT signatures.
 _jwks_client: PyJWKClient | None = None
@@ -126,10 +175,41 @@ class AuthMiddleware(BaseHTTPMiddleware):
     async def _auth_api_key(
         self, auth_header: str, request: Request, call_next: RequestResponseEndpoint
     ) -> Response:
-        """Authenticate via ASAHI API key (for SDK/gateway requests)."""
+        """Authenticate via ASAHI API key (for SDK/gateway requests).
+
+        Uses a Redis cache (5min TTL) to avoid a DB round-trip on every request.
+        On cache miss, falls back to PostgreSQL and populates the cache.
+        """
         raw_key = auth_header.removeprefix("Bearer ")
         key_hash = hashlib.sha256(raw_key.encode()).hexdigest()
 
+        redis = getattr(request.app.state, "redis", None)
+
+        # ── Try Redis cache first ────────────────
+        cached = await _get_cached_auth(redis, key_hash)
+        if cached:
+            # Enforce scopes from cached data
+            key_scopes = cached.get("scopes") or ["*"]
+            if not _check_scopes(key_scopes, request.url.path):
+                return JSONResponse(
+                    {"error": {"code": "insufficient_scope", "message": f"API key lacks required scope for {request.url.path}"}},
+                    status_code=403,
+                )
+
+            request.state.org_id = cached["org_id"]
+            request.state.org = _CachedOrg(cached)
+            request.state.api_key_id = cached["api_key_id"]
+            request.state.user_id = None
+            request.state.plan = cached.get("plan")
+            request.state.auth_type = "api_key"
+
+            # Fire-and-forget: update last_used_at
+            asyncio.create_task(
+                _update_key_last_used(uuid.UUID(cached["api_key_id"]))
+            )
+            return await call_next(request)
+
+        # ── Cache miss — fall back to DB ─────────
         async with async_session_factory() as session:
             result = await session.execute(
                 select(ApiKey).where(
@@ -166,6 +246,17 @@ class AuthMiddleware(BaseHTTPMiddleware):
             request.state.user_id = None
             request.state.plan = org.plan
             request.state.auth_type = "api_key"
+
+            # ── Populate Redis cache ─────────────
+            cache_data = {
+                "org_id": str(api_key.organisation_id),
+                "api_key_id": str(api_key.id),
+                "scopes": key_scopes,
+                "plan": org.plan,
+                "monthly_request_limit": org.monthly_request_limit,
+                "monthly_budget_usd": float(org.monthly_budget_usd) if org.monthly_budget_usd else None,
+            }
+            asyncio.create_task(_set_cached_auth(redis, key_hash, cache_data))
 
         # Fire-and-forget: update last_used_at
         asyncio.create_task(

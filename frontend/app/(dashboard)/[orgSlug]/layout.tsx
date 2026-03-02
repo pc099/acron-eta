@@ -5,6 +5,8 @@ import { usePathname } from "next/navigation";
 import { Sidebar } from "@/components/layout/sidebar";
 import { DashboardHeader } from "@/components/layout/dashboard-header";
 import { ErrorBoundary } from "@/components/error-boundary";
+import { CommandMenu } from "@/components/command-menu";
+import { useKeyboardShortcuts } from "@/lib/hooks/use-keyboard-shortcuts";
 
 export default function OrgLayout({
   children,
@@ -16,12 +18,15 @@ export default function OrgLayout({
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
 
+  useKeyboardShortcuts(params.orgSlug);
+
   React.useEffect(() => {
     setSidebarOpen(false);
   }, [pathname]);
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
+      <CommandMenu orgSlug={params.orgSlug} />
       <Sidebar
         orgSlug={params.orgSlug}
         currentPath={pathname}

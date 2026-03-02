@@ -1,0 +1,32 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "asahi-ai"
+version = "0.1.0"
+description = "LLM inference optimization — 85-97% cost savings"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+keywords = ["llm", "ai", "cost-optimization", "caching", "routing"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+]
+dependencies = [
+    "httpx>=0.25.0,<1",
+    "pydantic>=2.0.0,<3",
+    "anyio>=3.5.0,<5",
+]
+
+[project.optional-dependencies]
+dev = ["pytest", "pytest-asyncio", "respx", "ruff", "mypy"]
+
+[project.urls]
+Homepage = "https://asahi.dev"
+Documentation = "https://docs.asahi.dev"
+Repository = "https://github.com/asahi-ai/asahi-python"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/asahi"]

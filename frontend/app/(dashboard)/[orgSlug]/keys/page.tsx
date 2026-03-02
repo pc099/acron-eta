@@ -1,11 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { listKeys, createKey, revokeKey } from "@/lib/api";
 import type { ApiKeyCreateResponse } from "@/lib/api";
-import { Copy, Eye, EyeOff, Plus, Trash2 } from "lucide-react";
+import { Copy, Eye, EyeOff, Plus, Trash2, AlertTriangle, X } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -16,6 +16,7 @@ export default function KeysPage() {
   const [showCreate, setShowCreate] = useState(false);
   const [newKeyName, setNewKeyName] = useState("");
   const [createdKey, setCreatedKey] = useState<ApiKeyCreateResponse | null>(null);
+  const [keyCopied, setKeyCopied] = useState(false);
   const [revealedKeys, setRevealedKeys] = useState<Set<string>>(new Set());
 
   const { data: keys, isLoading } = useQuery({
@@ -27,7 +28,9 @@ export default function KeysPage() {
     mutationFn: (name: string) => createKey({ name }, undefined, orgSlug),
     onSuccess: (data) => {
       setCreatedKey(data);
+      setKeyCopied(false);
       setNewKeyName("");
+      setShowCreate(false);
       queryClient.invalidateQueries({ queryKey: ["keys"] });
       toast.success("API key created");
     },
@@ -80,33 +83,17 @@ export default function KeysPage() {
         </p>
       </div>
 
-      {/* Created key modal */}
+      {/* Show-once modal for newly created key */}
       {createdKey && (
-        <div className="rounded-lg border-2 border-asahi bg-asahi/10 p-6">
-          <h3 className="text-lg font-bold text-asahi">
-            Save your API key now
-          </h3>
-          <p className="mt-1 text-sm text-muted-foreground">
-            This key will not be shown again. Copy it now.
-          </p>
-          <div className="mt-4 flex items-center gap-2">
-            <code className="flex-1 rounded-md border border-border bg-muted px-4 py-3 font-mono text-sm text-foreground">
-              {createdKey.raw_key}
-            </code>
-            <button
-              onClick={() => copyToClipboard(createdKey.raw_key)}
-              className="rounded-md border border-border p-3 hover:bg-muted transition-colors"
-            >
-              <Copy className="h-4 w-4" />
-            </button>
-          </div>
-          <button
-            onClick={() => setCreatedKey(null)}
-            className="mt-4 text-sm text-muted-foreground hover:text-foreground"
-          >
-            I've copied my key
-          </button>
-        </div>
+        <ShowOnceKeyModal
+          keyData={createdKey}
+          copied={keyCopied}
+          onCopy={() => {
+            copyToClipboard(createdKey.raw_key);
+            setKeyCopied(true);
+          }}
+          onDismiss={() => setCreatedKey(null)}
+        />
       )}
 
       {/* Create form */}
@@ -121,6 +108,10 @@ export default function KeysPage() {
               placeholder="Key name (e.g., Production, Staging)"
               value={newKeyName}
               onChange={(e) => setNewKeyName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && newKeyName.trim())
+                  createMutation.mutate(newKeyName.trim());
+              }}
               className="flex-1 rounded-md border border-border bg-background px-4 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-asahi"
             />
             <button
@@ -239,6 +230,119 @@ export default function KeysPage() {
             </tbody>
           </table>
         )}
+      </div>
+    </div>
+  );
+}
+
+/* ── Show-Once Key Modal ───────────────────────── */
+
+function ShowOnceKeyModal({
+  keyData,
+  copied,
+  onCopy,
+  onDismiss,
+}: {
+  keyData: ApiKeyCreateResponse;
+  copied: boolean;
+  onCopy: () => void;
+  onDismiss: () => void;
+}) {
+  const [secondsLeft, setSecondsLeft] = useState(60);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    intervalRef.current = setInterval(() => {
+      setSecondsLeft((s) => {
+        if (s <= 1) {
+          if (intervalRef.current) clearInterval(intervalRef.current);
+          return 0;
+        }
+        return s - 1;
+      });
+    }, 1000);
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
+  }, []);
+
+  // Auto-dismiss when timer hits 0
+  useEffect(() => {
+    if (secondsLeft === 0) onDismiss();
+  }, [secondsLeft, onDismiss]);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+      <div className="relative w-full max-w-lg rounded-xl border border-border bg-card p-6 shadow-2xl animate-fade-in">
+        {/* Timer badge */}
+        <div className="absolute right-4 top-4 flex items-center gap-1.5">
+          <div
+            className={cn(
+              "flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold",
+              secondsLeft <= 10
+                ? "bg-red-500/20 text-red-400"
+                : "bg-muted text-muted-foreground"
+            )}
+          >
+            {secondsLeft}
+          </div>
+        </div>
+
+        <h3 className="text-lg font-bold text-foreground">
+          Your API Key
+        </h3>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Key <span className="font-medium text-foreground">{keyData.name}</span> has been created.
+        </p>
+
+        {/* Warning */}
+        <div className="mt-4 flex items-start gap-3 rounded-md border border-orange-500/30 bg-orange-500/10 p-3">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-orange-400" />
+          <p className="text-sm text-orange-200">
+            This is the only time this key will be shown. Copy it now and store
+            it in a secure location.
+          </p>
+        </div>
+
+        {/* Key display */}
+        <div className="mt-4 flex items-center gap-2">
+          <code className="flex-1 overflow-x-auto rounded-md border border-border bg-background px-4 py-3 font-mono text-sm text-foreground">
+            {keyData.raw_key}
+          </code>
+          <button
+            onClick={onCopy}
+            className={cn(
+              "rounded-md border p-3 transition-colors",
+              copied
+                ? "border-green-500/50 bg-green-500/10 text-green-400"
+                : "border-border text-muted-foreground hover:bg-muted hover:text-foreground"
+            )}
+          >
+            <Copy className="h-4 w-4" />
+          </button>
+        </div>
+
+        {/* Confirm button */}
+        <button
+          onClick={onDismiss}
+          disabled={!copied}
+          className={cn(
+            "mt-6 w-full rounded-md px-4 py-2.5 text-sm font-medium transition-colors",
+            copied
+              ? "bg-asahi text-white hover:bg-asahi-dark"
+              : "cursor-not-allowed bg-muted text-muted-foreground"
+          )}
+        >
+          {copied ? "I've copied my key" : "Copy the key first to continue"}
+        </button>
+
+        {/* Progress bar */}
+        <div className="mt-4 h-1 w-full overflow-hidden rounded-full bg-muted">
+          <div
+            className="h-full rounded-full bg-asahi transition-all duration-1000 ease-linear"
+            style={{ width: `${(secondsLeft / 60) * 100}%` }}
+          />
+        </div>
       </div>
     </div>
   );

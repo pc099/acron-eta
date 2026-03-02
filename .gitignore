@@ -3,6 +3,16 @@
 !**/.env.example
 .claude
 .cursor
+
+# Windows reserved device names (Git cannot add these)
+nul
+con
+prn
+aux
+com1
+com2
+lpt1
+lpt2
 asahi/
 docs/
 __pycache__/

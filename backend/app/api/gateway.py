@@ -2,12 +2,15 @@
 
 POST /v1/chat/completions — Drop-in replacement for OpenAI API.
 Includes Redis cache integration, budget checks, and org limit enforcement.
+Supports both JSON and SSE streaming responses.
 """
 
+import asyncio
+import json
 import uuid
 
 from fastapi import APIRouter, HTTPException, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
 
 from app.config import get_settings
@@ -114,8 +117,23 @@ async def chat_completions(body: ChatCompletionRequest, request: Request):
     # Store result in request.state for metering middleware
     request.state.inference_result = result
 
+    completion_id = f"chatcmpl-{uuid.uuid4().hex[:24]}"
+
+    # ── SSE streaming mode ───────────────────────
+    if body.stream:
+        return StreamingResponse(
+            _stream_response(completion_id, result, body.model),
+            media_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+                "X-Accel-Buffering": "no",
+            },
+        )
+
+    # ── Normal JSON response ─────────────────────
     return {
-        "id": f"chatcmpl-{uuid.uuid4().hex[:24]}",
+        "id": completion_id,
         "object": "chat.completion",
         "model": result.model_used,
         "choices": [
@@ -142,3 +160,63 @@ async def chat_completions(body: ChatCompletionRequest, request: Request):
             "routing_reason": result.routing_reason,
         },
     }
+
+
+async def _stream_response(
+    completion_id: str,
+    result: GatewayResult,
+    model_requested: str | None,
+):
+    """Yield OpenAI-compatible SSE chunks from a completed inference result.
+
+    Splits the full response into words and streams them one by one with a
+    small delay to simulate token-level streaming.  The final chunk includes
+    ``finish_reason: "stop"`` followed by the ``[DONE]`` sentinel.
+    """
+
+    def _chunk(content: str | None, finish_reason: str | None) -> str:
+        payload = {
+            "id": completion_id,
+            "object": "chat.completion.chunk",
+            "model": result.model_used,
+            "choices": [
+                {
+                    "index": 0,
+                    "delta": {"content": content} if content else {},
+                    "finish_reason": finish_reason,
+                }
+            ],
+        }
+        return f"data: {json.dumps(payload)}\n\n"
+
+    # Stream words with a small delay between each
+    words = result.response.split(" ")
+    for i, word in enumerate(words):
+        token = word if i == 0 else f" {word}"
+        yield _chunk(token, None)
+        await asyncio.sleep(0.02)
+
+    # Final chunk — stop signal
+    yield _chunk(None, "stop")
+
+    # Include asahi metadata as a custom SSE event for SDK consumers
+    asahi_payload = {
+        "cache_hit": result.cache_hit,
+        "cache_tier": result.cache_tier,
+        "model_requested": model_requested,
+        "model_used": result.model_used,
+        "cost_without_asahi": result.cost_without_asahi,
+        "cost_with_asahi": result.cost_with_asahi,
+        "savings_usd": result.savings_usd,
+        "savings_pct": result.savings_pct,
+        "routing_reason": result.routing_reason,
+        "usage": {
+            "prompt_tokens": result.input_tokens,
+            "completion_tokens": result.output_tokens,
+            "total_tokens": result.input_tokens + result.output_tokens,
+        },
+    }
+    yield f"event: asahi\ndata: {json.dumps(asahi_payload)}\n\n"
+
+    # OpenAI [DONE] sentinel
+    yield "data: [DONE]\n\n"

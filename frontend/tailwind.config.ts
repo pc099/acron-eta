@@ -9,8 +9,8 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        // ASAHI Brand
-        asahi: {
+        // Acorn Brand
+        acorn: {
           DEFAULT: "#FF6B35",
           light: "#FFB84D",
           lighter: "#FFF3E0",

@@ -410,6 +410,21 @@ export async function getForecast(days: number = 30, token?: string) {
   );
 }
 
+export interface Recommendation {
+  type: string;
+  title: string;
+  description: string;
+  impact: string;
+}
+
+export async function getRecommendations(token?: string) {
+  return fetchApi<{ recommendations: Recommendation[] }>(
+    "/analytics/recommendations",
+    {},
+    token
+  );
+}
+
 // ── Audit ───────────────────────────────────
 
 export async function getAuditLog(
