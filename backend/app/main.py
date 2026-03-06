@@ -89,7 +89,9 @@ async def lifespan(app: FastAPI):
     """Startup: fix schema if needed, create tables + connect Redis. Shutdown: cleanup."""
     settings = get_settings()
 
-    await _ensure_schema()
+    if settings.auto_create_schema:
+        logger.warning("AUTO_CREATE_SCHEMA is enabled; creating schema outside Alembic.")
+        await _ensure_schema()
 
     # Connect to Redis
     try:
@@ -196,5 +198,6 @@ def create_app() -> FastAPI:
 
 
 app = create_app()
+
 
 

@@ -24,6 +24,7 @@ class Settings(BaseSettings):
 
     # Database
     database_url: str = "postgresql+asyncpg://asahio:asahio_dev_password@localhost:5432/asahio"
+    auto_create_schema: bool = False
 
     @model_validator(mode="after")
     def _normalize_database_url(self) -> "Settings":
@@ -104,4 +105,5 @@ def get_settings() -> Settings:
 def reset_settings() -> None:
     """Clear the settings cache. Used in tests."""
     get_settings.cache_clear()
+
 
