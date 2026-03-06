@@ -56,7 +56,7 @@ export function DashboardHeader({
           {orgSlug}
         </h2>
         {overview && overview.total_savings_usd > 0 && (
-          <span className="text-sm font-semibold text-asahi">
+          <span className="text-sm font-semibold text-asahio">
             {formatCurrency(overview.total_savings_usd)} saved this month
           </span>
         )}

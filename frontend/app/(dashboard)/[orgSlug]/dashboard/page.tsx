@@ -48,7 +48,7 @@ export default function DashboardPage({
       <div>
         <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
         <p className="text-sm text-muted-foreground">
-          Monitor your ASAHI optimization metrics
+          Monitor your ASAHIO optimization metrics
         </p>
       </div>
 

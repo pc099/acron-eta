@@ -498,7 +498,7 @@ async def analytics_recommendations(
         recommendations.append({
             "type": "onboarding",
             "title": "Increase API usage",
-            "description": "You're only making a few requests. The more traffic you route through ASAHI, the more you save.",
+            "description": "You're only making a few requests. The more traffic you route through ASAHIO, the more you save.",
             "impact": "medium",
         })
 

@@ -52,7 +52,7 @@ export default async function BootstrapPage() {
   } catch {
     // Backend is unreachable (not running, network error, etc.)
     return (
-      <BootstrapError message="Cannot connect to the ASAHI backend. Make sure the backend server is running." />
+      <BootstrapError message="Cannot connect to the ASAHIO backend. Make sure the backend server is running." />
     );
   }
 
@@ -86,7 +86,7 @@ export default async function BootstrapPage() {
     });
   } catch {
     return (
-      <BootstrapError message="Cannot connect to the ASAHI backend. Make sure the backend server is running." />
+      <BootstrapError message="Cannot connect to the ASAHIO backend. Make sure the backend server is running." />
     );
   }
 

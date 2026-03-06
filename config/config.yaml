@@ -48,7 +48,7 @@ tracking:
   log_dir: "data/logs"
   enable_kafka: false
   kafka_bootstrap_servers: "localhost:9092"
-  kafka_topic: "asahi_inference_events"
+  kafka_topic: "asahio_inference_events"
   baseline_input_rate: 0.010   # GPT-4 Turbo $/1k input tokens
   baseline_output_rate: 0.030  # GPT-4 Turbo $/1k output tokens
 

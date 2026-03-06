@@ -7,7 +7,7 @@ import { AuthSetup } from "@/components/providers/auth-setup";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "ASAHI - LLM Inference Cost Optimizer",
+  title: "ASAHIO - LLM Inference Cost Optimizer",
   description:
     "Intelligent routing and caching to cut LLM inference costs by 85-97%. Drop-in OpenAI replacement.",
 };

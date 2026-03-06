@@ -56,7 +56,7 @@ function SidebarNav({ orgSlug, currentPath, onItemClick }: NavProps) {
               className={cn(
                 "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors duration-150",
                 active
-                  ? "border-l-2 border-asahi bg-asahi/10 text-asahi"
+                  ? "border-l-2 border-asahio bg-asahio/10 text-asahio"
                   : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
               )}
             >
@@ -80,7 +80,7 @@ function SidebarNav({ orgSlug, currentPath, onItemClick }: NavProps) {
               className={cn(
                 "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors duration-150",
                 active
-                  ? "border-l-2 border-asahi bg-asahi/10 text-asahi"
+                  ? "border-l-2 border-asahio bg-asahio/10 text-asahio"
                   : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
               )}
             >
@@ -105,10 +105,10 @@ export function Sidebar({
       {/* Desktop sidebar */}
       <aside className="hidden w-64 flex-col border-r border-border bg-sidebar md:flex">
         <div className="flex h-14 items-center gap-2 border-b border-border px-6">
-          <div className="flex h-7 w-7 items-center justify-center rounded-md bg-asahi">
+          <div className="flex h-7 w-7 items-center justify-center rounded-md bg-asahio">
             <span className="text-sm font-bold text-white">A</span>
           </div>
-          <span className="text-lg font-bold text-foreground">ASAHI</span>
+          <span className="text-lg font-bold text-foreground">ASAHIO</span>
         </div>
         <SidebarNav orgSlug={orgSlug} currentPath={currentPath} />
         <div className="border-t border-border px-6 py-3">
@@ -127,10 +127,10 @@ export function Sidebar({
           />
           <aside className="relative z-50 flex h-full w-64 flex-col border-r border-border bg-sidebar shadow-lg">
             <div className="flex h-14 items-center gap-2 border-b border-border px-6">
-              <div className="flex h-7 w-7 items-center justify-center rounded-md bg-asahi">
+              <div className="flex h-7 w-7 items-center justify-center rounded-md bg-asahio">
                 <span className="text-sm font-bold text-white">A</span>
               </div>
-              <span className="text-lg font-bold text-foreground">ASAHI</span>
+              <span className="text-lg font-bold text-foreground">ASAHIO</span>
             </div>
             <SidebarNav
               orgSlug={orgSlug}

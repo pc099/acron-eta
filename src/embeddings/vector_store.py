@@ -209,7 +209,7 @@ class PineconeVectorDB:
     def __init__(
         self,
         api_key: Optional[str] = None,
-        index_name: str = "asahi-vectors",
+        index_name: str = "asahio-vectors",
         dimension: int = 1024,
         namespace: Optional[str] = None,
     ) -> None:

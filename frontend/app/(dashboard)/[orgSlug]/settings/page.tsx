@@ -27,7 +27,7 @@ export default function SettingsPage({
 
       {/* Navigation */}
       <div className="flex gap-4 border-b border-border">
-        <div className="border-b-2 border-asahi px-4 py-2 text-sm font-medium text-asahi">
+        <div className="border-b-2 border-asahio px-4 py-2 text-sm font-medium text-asahio">
           General
         </div>
         <Link
@@ -66,8 +66,8 @@ export default function SettingsPage({
           {/* Org info */}
           <div className="rounded-lg border border-border bg-card p-6 shadow-sm">
             <div className="flex items-center gap-3 mb-6">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-asahi/20">
-                <Building2 className="h-5 w-5 text-asahi" />
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-asahio/20">
+                <Building2 className="h-5 w-5 text-asahio" />
               </div>
               <h2 className="text-lg font-semibold text-foreground">
                 Organisation Details
@@ -96,7 +96,7 @@ export default function SettingsPage({
                   <label className="block text-xs font-medium text-muted-foreground">
                     Plan
                   </label>
-                  <span className="mt-1 inline-flex items-center rounded-full bg-asahi/20 px-2.5 py-0.5 text-xs font-medium text-asahi">
+                  <span className="mt-1 inline-flex items-center rounded-full bg-asahio/20 px-2.5 py-0.5 text-xs font-medium text-asahio">
                     {org.plan}
                   </span>
                 </div>
@@ -145,8 +145,8 @@ export default function SettingsPage({
             href={`/${params.orgSlug}/settings/team`}
             className="flex items-center gap-4 rounded-lg border border-border bg-card p-6 shadow-sm hover:bg-muted/50 transition-colors"
           >
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-asahi/20">
-              <Users className="h-5 w-5 text-asahi" />
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-asahio/20">
+              <Users className="h-5 w-5 text-asahio" />
             </div>
             <div>
               <h3 className="text-sm font-semibold text-foreground">

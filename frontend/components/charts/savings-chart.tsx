@@ -59,9 +59,9 @@ export function SavingsChart({ data }: SavingsChartProps) {
               formatter={(value: number, name: string) => [
                 formatCurrency(value),
                 name === "cost_without_asahi"
-                  ? "Without ASAHI"
+                  ? "Without ASAHIO"
                   : name === "cost_with_asahi"
-                    ? "With ASAHI"
+                    ? "With ASAHIO"
                     : "Savings",
               ]}
             />
@@ -71,7 +71,7 @@ export function SavingsChart({ data }: SavingsChartProps) {
               stroke="hsl(var(--muted-foreground))"
               strokeDasharray="5 5"
               fill="transparent"
-              name="Without ASAHI"
+              name="Without ASAHIO"
             />
             <Area
               type="monotone"
@@ -79,7 +79,7 @@ export function SavingsChart({ data }: SavingsChartProps) {
               stroke="#FF6B35"
               fill="#FF6B35"
               fillOpacity={0.1}
-              name="With ASAHI"
+              name="With ASAHIO"
             />
           </AreaChart>
         </ResponsiveContainer>

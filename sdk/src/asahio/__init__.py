@@ -1,13 +1,13 @@
-"""Acorn Python SDK — LLM inference cost optimization.
+"""ASAHIO Python SDK — LLM inference cost optimization.
 
 Drop-in replacement for the OpenAI Python client with automatic
 cost savings through smart routing, caching, and model selection.
 
 Usage::
 
-    from acorn import Acorn
+    from asahio import Asahio
 
-    client = Acorn(api_key="asahi_live_...")
+    client = Asahio(api_key="asahi_live_...")
     response = client.chat.completions.create(
         model="gpt-4o",
         messages=[{"role": "user", "content": "Hello"}],
@@ -16,21 +16,21 @@ Usage::
     print(f"Saved: ${response.asahi.savings_usd}")
 """
 
-from acorn._exceptions import (
+from asahio._exceptions import (
     APIConnectionError,
     APIError,
-    AcornError,
+    AsahioError,
     AuthenticationError,
     BudgetExceededError,
     RateLimitError,
 )
-from acorn._version import __version__
-from acorn.client import Acorn, AsyncAcorn
+from asahio._version import __version__
+from asahio.client import Asahio, AsyncAsahio
 
 __all__ = [
-    "Acorn",
-    "AsyncAcorn",
-    "AcornError",
+    "Asahio",
+    "AsyncAsahio",
+    "AsahioError",
     "AuthenticationError",
     "RateLimitError",
     "BudgetExceededError",

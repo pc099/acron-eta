@@ -14,7 +14,7 @@ from typing import AsyncIterator, Iterator
 
 import httpx
 
-from acorn.types.chat import ChatCompletionChunk
+from asahio.types.chat import ChatCompletionChunk
 
 
 class Stream:

@@ -94,7 +94,7 @@ def create_app(use_mock: bool = False) -> FastAPI:
     settings = get_settings()
 
     app = FastAPI(
-        title="Asahi",
+        title="Asahio",
         description="LLM Inference Cost Optimization API",
         version=settings.api.version,
     )
@@ -117,7 +117,7 @@ def create_app(use_mock: bool = False) -> FastAPI:
         if os.environ.get("PINECONE_API_KEY"):
             try:
                 vector_db = PineconeVectorDB(
-                    index_name=os.environ.get("PINECONE_INDEX", "asahi-vectors"),
+                    index_name=os.environ.get("PINECONE_INDEX", "asahio-vectors"),
                     dimension=embedding_config.dimension,
                 )
                 logger.info("Tier 2 using Pinecone vector DB", extra={})

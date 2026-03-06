@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 import { Users } from "lucide-react";
 
 const roleColors: Record<string, string> = {
-  owner: "bg-asahi/20 text-asahi",
+  owner: "bg-asahio/20 text-asahio",
   admin: "bg-blue-500/20 text-blue-400",
   member: "bg-muted text-muted-foreground",
 };
@@ -39,7 +39,7 @@ export default function TeamPage({
         >
           General
         </Link>
-        <div className="border-b-2 border-asahi px-4 py-2 text-sm font-medium text-asahi">
+        <div className="border-b-2 border-asahio px-4 py-2 text-sm font-medium text-asahio">
           Team
         </div>
         <Link
@@ -83,7 +83,7 @@ export default function TeamPage({
                 >
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
-                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-asahi/20 text-xs font-medium text-asahi">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-asahio/20 text-xs font-medium text-asahio">
                         {(member.name || member.email)
                           .charAt(0)
                           .toUpperCase()}

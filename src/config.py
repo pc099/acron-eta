@@ -76,7 +76,7 @@ class TrackingSettings:
     log_dir: str = "data/logs"
     enable_kafka: bool = False
     kafka_bootstrap_servers: str = "localhost:9092"
-    kafka_topic: str = "asahi_inference_events"
+    kafka_topic: str = "asahio_inference_events"
     baseline_input_rate: float = 0.010
     baseline_output_rate: float = 0.030
 

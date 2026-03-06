@@ -85,14 +85,14 @@ export default function CachePage({
           {/* Overall hit rate */}
           <div className="rounded-lg border border-border bg-card p-6 shadow-sm">
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-asahi/20">
-                <Database className="h-5 w-5 text-asahi" />
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-asahio/20">
+                <Database className="h-5 w-5 text-asahio" />
               </div>
               <div>
                 <p className="text-sm font-medium text-muted-foreground">
                   Overall Cache Hit Rate
                 </p>
-                <p className="text-3xl font-bold text-asahi">
+                <p className="text-3xl font-bold text-asahio">
                   {formatPercent(cache.cache_hit_rate * 100)}
                 </p>
               </div>
@@ -100,7 +100,7 @@ export default function CachePage({
             <div className="mt-4">
               <div className="h-3 w-full overflow-hidden rounded-full bg-muted">
                 <div
-                  className="h-3 rounded-full bg-asahi transition-all duration-500"
+                  className="h-3 rounded-full bg-asahio transition-all duration-500"
                   style={{ width: `${cache.cache_hit_rate * 100}%` }}
                 />
               </div>

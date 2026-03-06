@@ -124,7 +124,7 @@ def create_app() -> FastAPI:
     """Create and configure the FastAPI application."""
     settings = get_settings()
     app = FastAPI(
-        title="ASAHI API",
+        title="ASAHIO API",
         version="1.0.0",
         description="LLM Inference Optimization Platform — route, cache, save.",
         lifespan=lifespan,

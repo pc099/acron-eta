@@ -44,7 +44,7 @@ export default function SecurityPage({
         >
           Team
         </Link>
-        <div className="border-b-2 border-asahi px-4 py-2 text-sm font-medium text-asahi">
+        <div className="border-b-2 border-asahio px-4 py-2 text-sm font-medium text-asahio">
           Security
         </div>
       </div>
@@ -52,8 +52,8 @@ export default function SecurityPage({
       {/* Audit log table */}
       <div className="rounded-lg border border-border bg-card shadow-sm">
         <div className="flex items-center gap-3 border-b border-border px-4 py-3">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-asahi/20">
-            <Shield className="h-4 w-4 text-asahi" />
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-asahio/20">
+            <Shield className="h-4 w-4 text-asahio" />
           </div>
           <h2 className="text-sm font-semibold text-foreground">Audit Log</h2>
         </div>

@@ -27,7 +27,7 @@ export default function GatewayPage({ params }: { params: { orgSlug: string } })
           <h1 className="text-2xl font-bold text-foreground">Gateway</h1>
           <p className="text-sm text-muted-foreground">Request logs and playground</p>
         </div>
-        <Link href={`/${params.orgSlug}/gateway/playground`} className="rounded-md bg-asahi px-4 py-2 text-sm font-medium text-white hover:bg-asahi-dark transition-colors">
+        <Link href={`/${params.orgSlug}/gateway/playground`} className="rounded-md bg-asahio px-4 py-2 text-sm font-medium text-white hover:bg-asahio-dark transition-colors">
           Open Playground
         </Link>
       </div>
@@ -49,8 +49,8 @@ export default function GatewayPage({ params }: { params: { orgSlug: string } })
                   <th className="px-4 py-3">Time</th>
                   <th className="px-4 py-3">Model</th>
                   <th className="px-4 py-3">In/Out</th>
-                  <th className="px-4 py-3">Without ASAHI</th>
-                  <th className="px-4 py-3">With ASAHI</th>
+                  <th className="px-4 py-3">Without ASAHIO</th>
+                  <th className="px-4 py-3">With ASAHIO</th>
                   <th className="px-4 py-3">Cache</th>
                   <th className="px-4 py-3">Savings</th>
                   <th className="px-4 py-3">Latency</th>

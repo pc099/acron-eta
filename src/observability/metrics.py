@@ -349,47 +349,47 @@ class MetricsCollector:
 
         with self._lock:
             # -- Counters --
-            lines.append("# HELP asahi_requests_total Total inference requests")
-            lines.append("# TYPE asahi_requests_total counter")
+            lines.append("# HELP asahio_requests_total Total inference requests")
+            lines.append("# TYPE asahio_requests_total counter")
             for labels, val in sorted(self._requests_total.items()):
-                lines.append(f"asahi_requests_total{{{labels}}} {val}")
+                lines.append(f"asahio_requests_total{{{labels}}} {val}")
 
-            lines.append("# HELP asahi_cost_dollars_total Total cost in dollars")
-            lines.append("# TYPE asahi_cost_dollars_total counter")
+            lines.append("# HELP asahio_cost_dollars_total Total cost in dollars")
+            lines.append("# TYPE asahio_cost_dollars_total counter")
             for labels, val in sorted(self._cost_total.items()):
-                lines.append(f"asahi_cost_dollars_total{{{labels}}} {val:.6f}")
+                lines.append(f"asahio_cost_dollars_total{{{labels}}} {val:.6f}")
 
-            lines.append("# HELP asahi_savings_dollars_total Total savings")
-            lines.append("# TYPE asahi_savings_dollars_total counter")
+            lines.append("# HELP asahio_savings_dollars_total Total savings")
+            lines.append("# TYPE asahio_savings_dollars_total counter")
             for labels, val in sorted(self._savings_total.items()):
                 lines.append(
-                    f"asahi_savings_dollars_total{{{labels}}} {val:.6f}"
+                    f"asahio_savings_dollars_total{{{labels}}} {val:.6f}"
                 )
 
-            lines.append("# HELP asahi_cache_hits_total Cache hits by tier")
-            lines.append("# TYPE asahi_cache_hits_total counter")
+            lines.append("# HELP asahio_cache_hits_total Cache hits by tier")
+            lines.append("# TYPE asahio_cache_hits_total counter")
             for labels, val in sorted(self._cache_hits.items()):
-                lines.append(f"asahi_cache_hits_total{{{labels}}} {val}")
+                lines.append(f"asahio_cache_hits_total{{{labels}}} {val}")
 
-            lines.append("# HELP asahi_cache_misses_total Cache misses by tier")
-            lines.append("# TYPE asahi_cache_misses_total counter")
+            lines.append("# HELP asahio_cache_misses_total Cache misses by tier")
+            lines.append("# TYPE asahio_cache_misses_total counter")
             for labels, val in sorted(self._cache_misses.items()):
-                lines.append(f"asahi_cache_misses_total{{{labels}}} {val}")
+                lines.append(f"asahio_cache_misses_total{{{labels}}} {val}")
 
-            lines.append("# HELP asahi_cache_hit_rate Rolling cache hit rate")
-            lines.append("# TYPE asahi_cache_hit_rate gauge")
+            lines.append("# HELP asahio_cache_hit_rate Rolling cache hit rate")
+            lines.append("# TYPE asahio_cache_hit_rate gauge")
             for labels, val in sorted(self._cache_hit_rate.items()):
-                lines.append(f"asahi_cache_hit_rate{{{labels}}} {val:.4f}")
+                lines.append(f"asahio_cache_hit_rate{{{labels}}} {val:.4f}")
 
-            lines.append("# HELP asahi_errors_total Error counts")
-            lines.append("# TYPE asahi_errors_total counter")
+            lines.append("# HELP asahio_errors_total Error counts")
+            lines.append("# TYPE asahio_errors_total counter")
             for labels, val in sorted(self._errors_total.items()):
-                lines.append(f"asahi_errors_total{{{labels}}} {val}")
+                lines.append(f"asahio_errors_total{{{labels}}} {val}")
 
             # -- Histograms --
             lines.extend(
                 self._format_histogram(
-                    "asahi_latency_ms",
+                    "asahio_latency_ms",
                     "Request latency distribution in ms",
                     self._latency_observations,
                     self._LATENCY_BUCKETS,
@@ -397,7 +397,7 @@ class MetricsCollector:
             )
             lines.extend(
                 self._format_histogram(
-                    "asahi_token_count",
+                    "asahio_token_count",
                     "Token count distribution",
                     self._token_observations,
                     self._TOKEN_BUCKETS,
@@ -405,7 +405,7 @@ class MetricsCollector:
             )
             lines.extend(
                 self._format_histogram(
-                    "asahi_batch_size",
+                    "asahio_batch_size",
                     "Batch size distribution",
                     self._batch_size_observations,
                     self._BATCH_SIZE_BUCKETS,
@@ -414,14 +414,14 @@ class MetricsCollector:
 
             # -- Quality gauge --
             lines.append(
-                "# HELP asahi_quality_score Rolling quality average per model"
+                "# HELP asahio_quality_score Rolling quality average per model"
             )
-            lines.append("# TYPE asahi_quality_score gauge")
+            lines.append("# TYPE asahio_quality_score gauge")
             for model, scores in sorted(self._quality_score.items()):
                 if scores:
                     avg = sum(scores) / len(scores)
                     lines.append(
-                        f'asahi_quality_score{{model="{model}"}} {avg:.4f}'
+                        f'asahio_quality_score{{model="{model}"}} {avg:.4f}'
                     )
 
         return "\n".join(lines) + "\n"

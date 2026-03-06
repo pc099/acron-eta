@@ -1,9 +1,9 @@
 """Public SDK clients — drop-in replacements for the OpenAI Python client.
 
 Usage (sync):
-    from acorn import Acorn
+    from asahio import Asahio
 
-    client = Acorn(api_key="asahi_live_...")
+    client = Asahio(api_key="asahi_live_...")
     response = client.chat.completions.create(
         model="gpt-4o",
         messages=[{"role": "user", "content": "Hello"}],
@@ -12,9 +12,9 @@ Usage (sync):
     print(f"Saved: {response.asahi.savings_pct}%")
 
 Usage (async):
-    from acorn import AsyncAcorn
+    from asahio import AsyncAsahio
 
-    client = AsyncAcorn(api_key="asahi_live_...")
+    client = AsyncAsahio(api_key="asahi_live_...")
     response = await client.chat.completions.create(
         model="gpt-4o",
         messages=[{"role": "user", "content": "Hello"}],
@@ -26,13 +26,13 @@ from __future__ import annotations
 import os
 from typing import Any, Optional, Union, overload
 
-from acorn._base_client import AsyncBaseClient, BaseClient
-from acorn._exceptions import AcornError
-from acorn._streaming import AsyncStream, Stream
-from acorn._version import __version__
-from acorn.types.chat import ChatCompletion, ChatCompletionChunk
+from asahio._base_client import AsyncBaseClient, BaseClient
+from asahio._exceptions import AsahioError
+from asahio._streaming import AsyncStream, Stream
+from asahio._version import __version__
+from asahio.types.chat import ChatCompletion, ChatCompletionChunk
 
-_DEFAULT_BASE_URL = "https://api.acorn.dev"
+_DEFAULT_BASE_URL = "https://api.asahio.dev"
 
 
 # ── Sync ─────────────────────────────────────────
@@ -107,12 +107,12 @@ class Chat:
         self.completions = Completions(client)
 
 
-class Acorn:
-    """Synchronous Acorn client — drop-in replacement for ``openai.OpenAI``.
+class Asahio:
+    """Synchronous ASAHIO client — drop-in replacement for ``openai.OpenAI``.
 
     Args:
-        api_key: Your Acorn API key (``asahi_live_...``). Falls back to
-            the ``ACORN_API_KEY`` environment variable.
+        api_key: Your ASAHIO API key (``asahi_live_...``). Falls back to
+            the ``ASAHIO_API_KEY`` environment variable.
         base_url: Override the default API endpoint.
         timeout: Request timeout in seconds.
         max_retries: Number of automatic retries on 429 / 5xx.
@@ -130,10 +130,10 @@ class Acorn:
         max_retries: int = 2,
         org_slug: Optional[str] = None,
     ) -> None:
-        resolved_key = api_key or os.environ.get("ACORN_API_KEY")
+        resolved_key = api_key or os.environ.get("ASAHIO_API_KEY")
         if not resolved_key:
-            raise AcornError(
-                "No API key provided. Pass api_key= or set the ACORN_API_KEY env var."
+            raise AsahioError(
+                "No API key provided. Pass api_key= or set the ASAHIO_API_KEY env var."
             )
         self._client = BaseClient(
             base_url=base_url,
@@ -147,7 +147,7 @@ class Acorn:
     def close(self) -> None:
         self._client.close()
 
-    def __enter__(self) -> Acorn:
+    def __enter__(self) -> Asahio:
         return self
 
     def __exit__(self, *args: Any) -> None:
@@ -202,11 +202,11 @@ class AsyncChat:
         self.completions = AsyncCompletions(client)
 
 
-class AsyncAcorn:
-    """Asynchronous Acorn client — drop-in replacement for ``openai.AsyncOpenAI``.
+class AsyncAsahio:
+    """Asynchronous ASAHIO client — drop-in replacement for ``openai.AsyncOpenAI``.
 
     Args:
-        api_key: Your Acorn API key. Falls back to ``ACORN_API_KEY`` env var.
+        api_key: Your ASAHIO API key. Falls back to ``ASAHIO_API_KEY`` env var.
         base_url: Override the default API endpoint.
         timeout: Request timeout in seconds.
         max_retries: Number of automatic retries on 429 / 5xx.
@@ -224,10 +224,10 @@ class AsyncAcorn:
         max_retries: int = 2,
         org_slug: Optional[str] = None,
     ) -> None:
-        resolved_key = api_key or os.environ.get("ACORN_API_KEY")
+        resolved_key = api_key or os.environ.get("ASAHIO_API_KEY")
         if not resolved_key:
-            raise AcornError(
-                "No API key provided. Pass api_key= or set the ACORN_API_KEY env var."
+            raise AsahioError(
+                "No API key provided. Pass api_key= or set the ASAHIO_API_KEY env var."
             )
         self._client = AsyncBaseClient(
             base_url=base_url,
@@ -241,7 +241,7 @@ class AsyncAcorn:
     async def close(self) -> None:
         await self._client.close()
 
-    async def __aenter__(self) -> AsyncAcorn:
+    async def __aenter__(self) -> AsyncAsahio:
         return self
 
     async def __aexit__(self, *args: Any) -> None:

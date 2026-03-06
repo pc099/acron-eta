@@ -68,7 +68,7 @@ export default function KeysPage() {
         </div>
         <button
           onClick={() => setShowCreate(true)}
-          className="inline-flex items-center gap-2 rounded-md bg-asahi px-4 py-2 text-sm font-medium text-white hover:bg-asahi-dark transition-colors"
+          className="inline-flex items-center gap-2 rounded-md bg-asahio px-4 py-2 text-sm font-medium text-white hover:bg-asahio-dark transition-colors"
         >
           <Plus className="h-4 w-4" />
           Create Key
@@ -112,14 +112,14 @@ export default function KeysPage() {
                 if (e.key === "Enter" && newKeyName.trim())
                   createMutation.mutate(newKeyName.trim());
               }}
-              className="flex-1 rounded-md border border-border bg-background px-4 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-asahi"
+              className="flex-1 rounded-md border border-border bg-background px-4 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-asahio"
             />
             <button
               onClick={() => {
                 if (newKeyName.trim()) createMutation.mutate(newKeyName.trim());
               }}
               disabled={!newKeyName.trim() || createMutation.isPending}
-              className="rounded-md bg-asahi px-4 py-2 text-sm font-medium text-white hover:bg-asahi-dark disabled:opacity-50 transition-colors"
+              className="rounded-md bg-asahio px-4 py-2 text-sm font-medium text-white hover:bg-asahio-dark disabled:opacity-50 transition-colors"
             >
               {createMutation.isPending ? "Creating..." : "Create"}
             </button>
@@ -175,7 +175,7 @@ export default function KeysPage() {
                   <td className="px-4 py-3 font-mono text-xs">
                     {revealedKeys.has(key.id)
                       ? `${key.prefix}...${key.last_four}`
-                      : `asahi_****${key.last_four}`}
+                      : `asahio_****${key.last_four}`}
                     <button
                       onClick={() => {
                         const next = new Set(revealedKeys);
@@ -329,7 +329,7 @@ function ShowOnceKeyModal({
           className={cn(
             "mt-6 w-full rounded-md px-4 py-2.5 text-sm font-medium transition-colors",
             copied
-              ? "bg-asahi text-white hover:bg-asahi-dark"
+              ? "bg-asahio text-white hover:bg-asahio-dark"
               : "cursor-not-allowed bg-muted text-muted-foreground"
           )}
         >
@@ -339,7 +339,7 @@ function ShowOnceKeyModal({
         {/* Progress bar */}
         <div className="mt-4 h-1 w-full overflow-hidden rounded-full bg-muted">
           <div
-            className="h-full rounded-full bg-asahi transition-all duration-1000 ease-linear"
+            className="h-full rounded-full bg-asahio transition-all duration-1000 ease-linear"
             style={{ width: `${(secondsLeft / 60) * 100}%` }}
           />
         </div>

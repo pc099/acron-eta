@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 settings = get_settings()
 
 app = Celery(
-    "asahi",
+    "asahio",
     broker=settings.redis_url,
     backend=settings.redis_url,
 )

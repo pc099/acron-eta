@@ -11,24 +11,24 @@ from typing import Any, Iterator, Optional
 
 import httpx
 
-from acorn._exceptions import (
+from asahio._exceptions import (
     APIConnectionError,
     APIError,
-    AcornError,
+    AsahioError,
     AuthenticationError,
     BudgetExceededError,
     RateLimitError,
 )
-from acorn._version import __version__
+from asahio._version import __version__
 
-_USER_AGENT = f"acorn-python/{__version__}"
+_USER_AGENT = f"asahio-python/{__version__}"
 _DEFAULT_TIMEOUT = 120.0
 _DEFAULT_MAX_RETRIES = 2
 _RETRY_STATUS_CODES = {429, 500, 502, 503, 504}
 _INITIAL_BACKOFF = 0.5  # seconds
 
 
-def _map_error(response: httpx.Response) -> AcornError:
+def _map_error(response: httpx.Response) -> AsahioError:
     """Map an HTTP error response to the appropriate SDK exception."""
     body: Any = None
     try:
@@ -118,7 +118,7 @@ class BaseClient:
                 last_exc = APIConnectionError(exc)
             except httpx.TimeoutException as exc:
                 last_exc = APIConnectionError(exc)
-            except AcornError:
+            except AsahioError:
                 raise
 
             # Exponential backoff
@@ -207,7 +207,7 @@ class AsyncBaseClient:
                 last_exc = APIConnectionError(exc)
             except httpx.TimeoutException as exc:
                 last_exc = APIConnectionError(exc)
-            except AcornError:
+            except AsahioError:
                 raise
 
             if attempt < self._max_retries:

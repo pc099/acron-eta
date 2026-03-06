@@ -25,7 +25,7 @@ export default function LandingPage() {
       <nav className="fixed top-0 inset-x-0 z-50 border-b border-border bg-background/80 backdrop-blur-md">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6">
           <Link href="/" className="text-xl font-bold tracking-tight">
-            <span className="text-asahi">ASAHI</span>
+            <span className="text-asahio">ASAHIO</span>
           </Link>
           <div className="hidden items-center gap-8 md:flex">
             <a
@@ -56,7 +56,7 @@ export default function LandingPage() {
             </Link>
             <Link
               href="/sign-up"
-              className="rounded-lg bg-asahi px-4 py-2 text-sm font-medium text-white hover:bg-asahi-dark transition-colors"
+              className="rounded-lg bg-asahio px-4 py-2 text-sm font-medium text-white hover:bg-asahio-dark transition-colors"
             >
               Get Started
             </Link>
@@ -68,21 +68,21 @@ export default function LandingPage() {
       <section className="pt-32 pb-20 px-6">
         <div className="mx-auto grid max-w-7xl items-center gap-16 md:grid-cols-2">
           <div>
-            <div className="mb-4 text-sm font-medium uppercase tracking-wide text-asahi">
+            <div className="mb-4 text-sm font-medium uppercase tracking-wide text-asahio">
               Build intelligent inference
             </div>
             <h1 className="mb-6 text-4xl font-bold leading-tight text-foreground md:text-5xl">
               The inference optimizer for{" "}
-              <span className="text-asahi">cost efficiency</span>
+              <span className="text-asahio">cost efficiency</span>
             </h1>
             <p className="mb-8 text-lg leading-relaxed text-muted-foreground">
-              ASAHI intelligently routes requests, caches semantically similar
+              ASAHIO intelligently routes requests, caches semantically similar
               queries, and decomposes workflows to cut costs by 85-97%.
             </p>
             <div className="flex flex-wrap gap-4">
               <Link
                 href="/sign-up"
-                className="rounded-lg bg-asahi px-6 py-3 text-sm font-medium text-white hover:bg-asahi-dark transition-colors"
+                className="rounded-lg bg-asahio px-6 py-3 text-sm font-medium text-white hover:bg-asahio-dark transition-colors"
               >
                 Start Building
               </Link>
@@ -95,12 +95,12 @@ export default function LandingPage() {
             </div>
           </div>
           <div className="group relative flex h-80 items-center justify-center overflow-hidden rounded-xl border border-border bg-card p-12">
-            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-asahi/10 to-transparent opacity-0 transition duration-700 group-hover:opacity-100" />
+            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-asahio/10 to-transparent opacity-0 transition duration-700 group-hover:opacity-100" />
             <div className="z-10 text-center">
               {engineStatus === "checking" && (
                 <>
-                  <div className="mx-auto mb-4 h-16 w-16 animate-spin rounded-full border-t-2 border-asahi" />
-                  <p className="text-sm font-mono text-asahi">ASAHI ENGINE</p>
+                  <div className="mx-auto mb-4 h-16 w-16 animate-spin rounded-full border-t-2 border-asahio" />
+                  <p className="text-sm font-mono text-asahio">ASAHIO ENGINE</p>
                   <p className="mt-2 text-xs text-muted-foreground">
                     Checking...
                   </p>
@@ -108,10 +108,10 @@ export default function LandingPage() {
               )}
               {engineStatus === "ready" && (
                 <>
-                  <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full border-2 border-asahi bg-asahi/20">
-                    <span className="text-2xl text-asahi">&#10003;</span>
+                  <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full border-2 border-asahio bg-asahio/20">
+                    <span className="text-2xl text-asahio">&#10003;</span>
                   </div>
-                  <p className="text-sm font-mono text-asahi">ASAHI ENGINE</p>
+                  <p className="text-sm font-mono text-asahio">ASAHIO ENGINE</p>
                   <p className="mt-2 text-xs text-muted-foreground">
                     Ready to optimize
                   </p>
@@ -125,7 +125,7 @@ export default function LandingPage() {
                   <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full border border-border bg-muted">
                     <span className="text-xl text-muted-foreground">&#8635;</span>
                   </div>
-                  <p className="text-sm font-mono text-asahi">ASAHI ENGINE</p>
+                  <p className="text-sm font-mono text-asahio">ASAHIO ENGINE</p>
                   <p className="mt-2 text-xs text-muted-foreground">
                     Configure API URL in Settings to check status
                   </p>
@@ -143,7 +143,7 @@ export default function LandingPage() {
       >
         <div className="mx-auto max-w-7xl">
           <h2 className="mb-4 text-center text-3xl font-bold text-foreground md:text-4xl">
-            Why ASAHI?
+            Why ASAHIO?
           </h2>
           <p className="mb-12 text-center text-muted-foreground">
             Three intelligent caching layers
@@ -174,8 +174,8 @@ export default function LandingPage() {
                 key={feature.title}
                 className={`rounded-xl border p-6 transition-colors ${
                   feature.highlight
-                    ? "border-asahi/50 bg-asahi/5"
-                    : "border-border bg-background hover:border-asahi/30"
+                    ? "border-asahio/50 bg-asahio/5"
+                    : "border-border bg-background hover:border-asahio/30"
                 }`}
               >
                 <div className="mb-4 text-3xl">{feature.icon}</div>
@@ -210,7 +210,7 @@ export default function LandingPage() {
               >
                 <p
                   className={`text-3xl font-bold ${
-                    metric.highlight ? "text-asahi" : "text-foreground"
+                    metric.highlight ? "text-asahio" : "text-foreground"
                   }`}
                 >
                   {metric.value}
@@ -228,7 +228,7 @@ export default function LandingPage() {
       <section id="pricing" className="sr-only" aria-hidden />
 
       {/* CTA */}
-      <section className="relative overflow-hidden bg-asahi px-6 py-20">
+      <section className="relative overflow-hidden bg-asahio px-6 py-20">
         <div className="absolute inset-0 bg-black/10" />
         <div className="relative z-10 mx-auto max-w-4xl text-center text-white">
           <h2 className="mb-6 text-3xl font-bold md:text-4xl">
@@ -240,7 +240,7 @@ export default function LandingPage() {
           </p>
           <Link
             href="/sign-up"
-            className="inline-block rounded-lg bg-white px-6 py-3 text-sm font-medium text-asahi-dark hover:bg-neutral-100 transition-colors"
+            className="inline-block rounded-lg bg-white px-6 py-3 text-sm font-medium text-asahio-dark hover:bg-neutral-100 transition-colors"
           >
             Start Building
           </Link>
@@ -336,7 +336,7 @@ export default function LandingPage() {
         </div>
         <div className="mx-auto mt-12 flex max-w-7xl flex-col items-center justify-between gap-4 border-t border-border pt-8 md:flex-row">
           <p className="text-sm">
-            &copy; {new Date().getFullYear()} ASAHI. All rights reserved.
+            &copy; {new Date().getFullYear()} ASAHIO. All rights reserved.
           </p>
           <div className="flex gap-4">
             <div className="h-6 w-6 rounded-full bg-muted" />

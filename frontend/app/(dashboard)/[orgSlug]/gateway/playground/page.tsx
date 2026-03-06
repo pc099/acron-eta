@@ -22,8 +22,8 @@ const ROUTING_MODES = ["AUTOPILOT", "GUIDED", "EXPLICIT"] as const;
 
 const MODE_DESCRIPTIONS: Record<string, string> = {
   AUTOPILOT: "Auto-detects task type and selects the cheapest model that meets quality requirements",
-  GUIDED: "You set quality and latency preferences, ASAHI picks the best model",
-  EXPLICIT: "You choose the exact model — ASAHI shows what you could save with alternatives",
+  GUIDED: "You set quality and latency preferences, ASAHIO picks the best model",
+  EXPLICIT: "You choose the exact model — ASAHIO shows what you could save with alternatives",
 };
 
 // Maps frontend quality labels to backend-expected values
@@ -83,7 +83,7 @@ export default function PlaygroundPage() {
       <div>
         <h1 className="text-2xl font-bold text-foreground">Playground</h1>
         <p className="text-sm text-muted-foreground">
-          Test inference requests and see ASAHI optimization in action
+          Test inference requests and see ASAHIO optimization in action
         </p>
       </div>
 
@@ -103,7 +103,7 @@ export default function PlaygroundPage() {
                   className={cn(
                     "flex-1 rounded-md px-3 py-2 text-sm font-medium transition-colors",
                     routingMode === mode
-                      ? "bg-asahi text-white"
+                      ? "bg-asahio text-white"
                       : "border border-border bg-background text-muted-foreground hover:text-foreground"
                   )}
                 >
@@ -126,7 +126,7 @@ export default function PlaygroundPage() {
                 <select
                   value={selectedModel}
                   onChange={(e) => setSelectedModel(e.target.value)}
-                  className="w-full appearance-none rounded-md border border-border bg-background px-4 py-2.5 pr-10 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-asahi"
+                  className="w-full appearance-none rounded-md border border-border bg-background px-4 py-2.5 pr-10 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-asahio"
                 >
                   {AVAILABLE_MODELS.map((m) => (
                     <option key={m.id} value={m.id}>
@@ -153,13 +153,13 @@ export default function PlaygroundPage() {
                   step={1}
                   value={qualityIndex}
                   onChange={(e) => setQualityIndex(Number(e.target.value))}
-                  className="w-full accent-asahi"
+                  className="w-full accent-asahio"
                 />
                 <div className="mt-2 flex justify-between text-xs text-muted-foreground">
                   {QUALITY_OPTIONS.map((q, i) => (
                     <span
                       key={q.value}
-                      className={cn(qualityIndex === i && "text-asahi font-medium")}
+                      className={cn(qualityIndex === i && "text-asahio font-medium")}
                     >
                       {q.label}
                     </span>
@@ -178,13 +178,13 @@ export default function PlaygroundPage() {
                   step={1}
                   value={latencyIndex}
                   onChange={(e) => setLatencyIndex(Number(e.target.value))}
-                  className="w-full accent-asahi"
+                  className="w-full accent-asahio"
                 />
                 <div className="mt-2 flex justify-between text-xs text-muted-foreground">
                   {LATENCY_OPTIONS.map((l, i) => (
                     <span
                       key={l.value}
-                      className={cn(latencyIndex === i && "text-asahi font-medium")}
+                      className={cn(latencyIndex === i && "text-asahio font-medium")}
                     >
                       {l.label}
                     </span>
@@ -207,13 +207,13 @@ export default function PlaygroundPage() {
                 step={1}
                 value={qualityIndex}
                 onChange={(e) => setQualityIndex(Number(e.target.value))}
-                className="w-full accent-asahi"
+                className="w-full accent-asahio"
               />
               <div className="mt-2 flex justify-between text-xs text-muted-foreground">
                 {QUALITY_OPTIONS.map((q, i) => (
                   <span
                     key={q.value}
-                    className={cn(qualityIndex === i && "text-asahi font-medium")}
+                    className={cn(qualityIndex === i && "text-asahio font-medium")}
                   >
                     {q.label}
                   </span>
@@ -232,7 +232,7 @@ export default function PlaygroundPage() {
               onChange={(e) => setMessage(e.target.value)}
               placeholder="Enter your prompt here..."
               rows={6}
-              className="w-full resize-none rounded-md border border-border bg-background px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-asahi"
+              className="w-full resize-none rounded-md border border-border bg-background px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-asahio"
               onKeyDown={(e) => {
                 if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) handleRun();
               }}
@@ -243,7 +243,7 @@ export default function PlaygroundPage() {
           <button
             onClick={handleRun}
             disabled={!message.trim() || mutation.isPending}
-            className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-asahi px-4 py-3 text-sm font-medium text-white hover:bg-asahi-dark disabled:opacity-50 transition-colors"
+            className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-asahio px-4 py-3 text-sm font-medium text-white hover:bg-asahio-dark disabled:opacity-50 transition-colors"
           >
             {mutation.isPending ? (
               <>

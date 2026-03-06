@@ -58,7 +58,7 @@ export function KpiCard({
           <Icon
             className={cn(
               "h-4 w-4",
-              highlight ? "text-asahi" : "text-muted-foreground"
+              highlight ? "text-asahio" : "text-muted-foreground"
             )}
           />
         )}
@@ -66,7 +66,7 @@ export function KpiCard({
       <p
         className={cn(
           "mt-2 text-2xl font-bold",
-          highlight ? "text-asahi" : "text-foreground"
+          highlight ? "text-asahio" : "text-foreground"
         )}
       >
         {formattedValue}

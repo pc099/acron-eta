@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "asahi-ai"
+name = "asahio-ai"
 version = "0.1.0"
 description = "LLM inference optimization — 85-97% cost savings"
 requires-python = ">=3.9"
@@ -24,9 +24,9 @@ dependencies = [
 dev = ["pytest", "pytest-asyncio", "respx", "ruff", "mypy"]
 
 [project.urls]
-Homepage = "https://asahi.dev"
-Documentation = "https://docs.asahi.dev"
-Repository = "https://github.com/asahi-ai/asahi-python"
+Homepage = "https://asahio.dev"
+Documentation = "https://docs.asahio.dev"
+Repository = "https://github.com/asahio-ai/asahio-python"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/asahi"]
+packages = ["src/asahio"]

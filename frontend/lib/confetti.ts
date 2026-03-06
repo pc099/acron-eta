@@ -1,7 +1,7 @@
 import confetti from "canvas-confetti";
 
 /**
- * Fire confetti with ASAHI brand colours.
+ * Fire confetti with ASAHIO brand colours.
  */
 export function fireConfetti() {
   const colors = ["#FF6B35", "#FFB84D", "#FFF3E0"];

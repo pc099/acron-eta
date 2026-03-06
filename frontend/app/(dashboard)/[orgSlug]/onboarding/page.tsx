@@ -20,7 +20,7 @@ import { fireConfetti } from "@/lib/confetti";
 const steps = [
   {
     title: "Install the SDK",
-    description: "Add the ASAHI Python SDK to your project",
+    description: "Add the ASAHIO Python SDK to your project",
     icon: Package,
   },
   {
@@ -30,7 +30,7 @@ const steps = [
   },
   {
     title: "Make your first request",
-    description: "Send an inference request through ASAHI",
+    description: "Send an inference request through ASAHIO",
     icon: Zap,
   },
   {
@@ -41,10 +41,10 @@ const steps = [
 ] as const;
 
 const codeSnippets: Record<number, string> = {
-  0: `pip install asahi-ai`,
-  1: `import asahi
+  0: `pip install asahio-ai`,
+  1: `import asahio
 
-client = asahi.Client(
+client = asahio.Client(
     api_key="your-api-key-here",
 )`,
   2: `response = client.chat.completions.create(
@@ -81,7 +81,7 @@ export default function OnboardingPage({
     if (prevRequests.current !== null && prevRequests.current === 0 && total > 0) {
       confettiFired.current = true;
       fireConfetti();
-      toast.success("Your first request went through! Welcome to ASAHI.");
+      toast.success("Your first request went through! Welcome to ASAHIO.");
     }
     prevRequests.current = total;
   }, [overview]);
@@ -99,7 +99,7 @@ export default function OnboardingPage({
             Getting Started
           </h1>
           <p className="text-sm text-muted-foreground">
-            Set up ASAHI in a few simple steps
+            Set up ASAHIO in a few simple steps
           </p>
         </div>
         <Link
@@ -121,7 +121,7 @@ export default function OnboardingPage({
                 index < currentStep
                   ? "bg-green-500 text-white"
                   : index === currentStep
-                    ? "bg-asahi text-white"
+                    ? "bg-asahio text-white"
                     : "border border-border bg-background text-muted-foreground"
               )}
             >
@@ -149,8 +149,8 @@ export default function OnboardingPage({
           {(() => {
             const Icon = steps[currentStep].icon;
             return (
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-asahi/20">
-                <Icon className="h-5 w-5 text-asahi" />
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-asahio/20">
+                <Icon className="h-5 w-5 text-asahio" />
               </div>
             );
           })()}
@@ -168,7 +168,7 @@ export default function OnboardingPage({
         {currentStep === 0 && (
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              Install the ASAHI SDK using pip:
+              Install the ASAHIO SDK using pip:
             </p>
             <div className="relative">
               <pre className="overflow-x-auto rounded-md border border-border bg-background p-4 font-mono text-sm text-foreground">
@@ -191,7 +191,7 @@ export default function OnboardingPage({
               Create an API key from the{" "}
               <Link
                 href={`/${params.orgSlug}/keys`}
-                className="text-asahi hover:underline"
+                className="text-asahio hover:underline"
               >
                 API Keys page
               </Link>
@@ -221,7 +221,7 @@ export default function OnboardingPage({
         {currentStep === 2 && (
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              Send your first inference request. ASAHI will automatically route
+              Send your first inference request. ASAHIO will automatically route
               it to the cheapest model that meets your quality requirements:
             </p>
             <div className="relative">
@@ -239,7 +239,7 @@ export default function OnboardingPage({
               Or try it in the{" "}
               <Link
                 href={`/${params.orgSlug}/gateway/playground`}
-                className="text-asahi hover:underline"
+                className="text-asahio hover:underline"
               >
                 Playground
               </Link>{" "}
@@ -253,7 +253,7 @@ export default function OnboardingPage({
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
               Once you start sending requests, your savings will appear on the
-              dashboard in real-time. ASAHI optimizes costs through:
+              dashboard in real-time. ASAHIO optimizes costs through:
             </p>
             <ul className="space-y-2 text-sm text-muted-foreground">
               <li className="flex items-center gap-2">
@@ -275,7 +275,7 @@ export default function OnboardingPage({
             </ul>
             <Link
               href={`/${params.orgSlug}/dashboard`}
-              className="inline-flex items-center gap-2 rounded-md bg-asahi px-4 py-2 text-sm font-medium text-white hover:bg-asahi-dark transition-colors"
+              className="inline-flex items-center gap-2 rounded-md bg-asahio px-4 py-2 text-sm font-medium text-white hover:bg-asahio-dark transition-colors"
             >
               Go to Dashboard
               <ChevronRight className="h-4 w-4" />
@@ -296,7 +296,7 @@ export default function OnboardingPage({
         {currentStep < steps.length - 1 && (
           <button
             onClick={() => setCurrentStep((s) => s + 1)}
-            className="inline-flex items-center gap-2 rounded-md bg-asahi px-4 py-2 text-sm font-medium text-white hover:bg-asahi-dark transition-colors"
+            className="inline-flex items-center gap-2 rounded-md bg-asahio px-4 py-2 text-sm font-medium text-white hover:bg-asahio-dark transition-colors"
           >
             Continue
             <ChevronRight className="h-4 w-4" />

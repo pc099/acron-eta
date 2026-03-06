@@ -1,6 +1,6 @@
 """Public type re-exports."""
 
-from acorn.types.chat import (
+from asahio.types.chat import (
     AsahiMetadata,
     ChatCompletion,
     ChatCompletionChunk,

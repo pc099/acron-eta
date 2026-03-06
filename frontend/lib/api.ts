@@ -1,5 +1,5 @@
 /**
- * Typed API client for the ASAHI backend.
+ * Typed API client for the ASAHIO backend.
  * All endpoints return typed responses — no `any`.
  */
 

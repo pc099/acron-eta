@@ -27,7 +27,7 @@ export function RecentRequestsTable({
         </h3>
         <Link
           href={`/${orgSlug}/gateway`}
-          className="text-xs font-medium text-asahi hover:underline"
+          className="text-xs font-medium text-asahio hover:underline"
         >
           View all requests →
         </Link>
@@ -44,8 +44,8 @@ export function RecentRequestsTable({
                 <th className="px-4 py-3">Time</th>
                 <th className="px-4 py-3">Model</th>
                 <th className="px-4 py-3">Tokens</th>
-                <th className="px-4 py-3">Without ASAHI</th>
-                <th className="px-4 py-3">With ASAHI</th>
+                <th className="px-4 py-3">Without ASAHIO</th>
+                <th className="px-4 py-3">With ASAHIO</th>
                 <th className="px-4 py-3">Cache</th>
                 <th className="px-4 py-3">Savings</th>
                 <th className="px-4 py-3">Latency</th>

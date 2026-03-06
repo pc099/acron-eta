@@ -32,13 +32,13 @@ const PERIODS = [
 ] as const;
 
 const IMPACT_STYLES: Record<string, string> = {
-  high: "border-asahi/30 bg-asahi/5",
+  high: "border-asahio/30 bg-asahio/5",
   medium: "border-blue-500/30 bg-blue-500/5",
   low: "border-muted-foreground/20 bg-muted/5",
 };
 
 const IMPACT_BADGE: Record<string, string> = {
-  high: "bg-asahi/20 text-asahi",
+  high: "bg-asahio/20 text-asahio",
   medium: "bg-blue-500/20 text-blue-400",
   low: "bg-muted text-muted-foreground",
 };
@@ -91,7 +91,7 @@ export default function AnalyticsPage({
         <div>
           <h1 className="text-2xl font-bold text-foreground">Analytics</h1>
           <p className="text-sm text-muted-foreground">
-            Deep dive into your ASAHI optimization performance
+            Deep dive into your ASAHIO optimization performance
           </p>
         </div>
 
@@ -104,7 +104,7 @@ export default function AnalyticsPage({
               className={cn(
                 "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
                 period === p.value
-                  ? "bg-asahi text-white"
+                  ? "bg-asahio text-white"
                   : "text-muted-foreground hover:text-foreground"
               )}
             >
@@ -130,9 +130,9 @@ export default function AnalyticsPage({
             <div className="rounded-lg border border-border bg-card p-6 shadow-sm">
               <div className="flex items-center justify-between">
                 <p className="text-sm font-medium text-muted-foreground">Total Savings</p>
-                <DollarSign className="h-4 w-4 text-asahi" />
+                <DollarSign className="h-4 w-4 text-asahio" />
               </div>
-              <p className="mt-2 text-2xl font-bold text-asahi">
+              <p className="mt-2 text-2xl font-bold text-asahio">
                 {formatCurrency(overview?.total_savings_usd ?? 0)}
               </p>
               {overview && overview.savings_delta_pct !== 0 && (
@@ -192,7 +192,7 @@ export default function AnalyticsPage({
       {/* Forecast */}
       <div className="rounded-lg border border-border bg-card p-6 shadow-sm">
         <div className="flex items-center gap-2 mb-4">
-          <BarChart3 className="h-4 w-4 text-asahi" />
+          <BarChart3 className="h-4 w-4 text-asahio" />
           <h3 className="text-sm font-semibold text-foreground">
             30-Day Forecast
           </h3>
@@ -234,7 +234,7 @@ export default function AnalyticsPage({
             </div>
             <div>
               <p className="text-xs text-muted-foreground">Efficiency Ratio</p>
-              <p className="mt-1 text-lg font-bold text-asahi">
+              <p className="mt-1 text-lg font-bold text-asahio">
                 {forecast.projected_cost_usd > 0
                   ? formatPercent(
                       (forecast.projected_savings_usd /
@@ -271,7 +271,7 @@ export default function AnalyticsPage({
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">Overall Hit Rate</span>
-                <span className="text-lg font-bold text-asahi">
+                <span className="text-lg font-bold text-asahio">
                   {formatPercent(cache.cache_hit_rate * 100)}
                 </span>
               </div>
@@ -364,7 +364,7 @@ export default function AnalyticsPage({
                     <div className="flex-1">
                       <div className="h-6 rounded bg-muted">
                         <div
-                          className="flex h-6 items-center rounded bg-asahi/20"
+                          className="flex h-6 items-center rounded bg-asahio/20"
                           style={{ width: `${widthPct}%` }}
                         >
                           <span className="px-2 text-xs font-medium text-foreground">
@@ -384,7 +384,7 @@ export default function AnalyticsPage({
       {/* Recommendations */}
       <div className="rounded-lg border border-border bg-card p-6 shadow-sm">
         <div className="flex items-center gap-2 mb-4">
-          <Lightbulb className="h-4 w-4 text-asahi" />
+          <Lightbulb className="h-4 w-4 text-asahio" />
           <h3 className="text-sm font-semibold text-foreground">
             Optimization Recommendations
           </h3>
