@@ -10,11 +10,16 @@ from __future__ import annotations
 
 import asyncio
 from pathlib import Path
+import sys
 
 from alembic import command
 from alembic.config import Config
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import create_async_engine
+
+BACKEND_DIR = Path(__file__).resolve().parents[1]
+if str(BACKEND_DIR) not in sys.path:
+    sys.path.insert(0, str(BACKEND_DIR))
 
 from app.config import get_settings
 
@@ -49,8 +54,7 @@ async def _inspect_database() -> tuple[bool, bool, str | None]:
 
 
 def _alembic_config() -> Config:
-    backend_dir = Path(__file__).resolve().parents[1]
-    return Config(str(backend_dir / "alembic.ini"))
+    return Config(str(BACKEND_DIR / "alembic.ini"))
 
 
 def main() -> None:

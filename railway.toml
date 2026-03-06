@@ -7,10 +7,11 @@ builder = "nixpacks"
 buildCommand = "pip install -r backend/requirements.txt"
 
 [deploy]
-preDeployCommand = "sh -c 'cd backend && python scripts/bootstrap_alembic.py'"
+preDeployCommand = "sh -c 'cd backend && PYTHONPATH=. python scripts/bootstrap_alembic.py'"
 # Start the NEW backend (backend/app/main.py) - NOT the old src/api/app.py.
 # backend/app/core/optimizer.py adds project root to sys.path for src/ imports.
 startCommand = "sh -c 'cd backend && uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}'"
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 3
+
 
