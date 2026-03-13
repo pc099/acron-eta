@@ -15,7 +15,18 @@ settings = get_settings()
 
 _engine_kwargs: dict = {"echo": settings.debug}
 if settings.database_url.startswith("postgresql"):
-    _engine_kwargs.update(pool_size=20, max_overflow=10, pool_pre_ping=True)
+    _engine_kwargs.update(
+        pool_size=20,
+        max_overflow=10,
+        pool_pre_ping=True,
+        connect_args={
+            "server_settings": {
+                "statement_timeout": "30000",
+                "lock_timeout": "10000",
+            },
+            "ssl": "prefer",
+        },
+    )
 elif "sqlite" in settings.database_url:
     # StaticPool ensures all connections share the same in-memory database
     _engine_kwargs.update(

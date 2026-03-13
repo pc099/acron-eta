@@ -39,6 +39,18 @@ from app.db import engine as db_engine  # noqa: E402
 from app.db.models import AuditLog, ApiKey, Base, KeyEnvironment, Member, MemberRole, Organisation, User  # noqa: E402
 
 
+@pytest.fixture(autouse=True)
+def _monkeypatch_response_class():
+    """Override pytest-flask autouse fixture (not applicable to FastAPI)."""
+    return
+
+
+@pytest.fixture(autouse=True)
+def _push_request_context():
+    """Override pytest-flask autouse fixture (not applicable to FastAPI)."""
+    return
+
+
 @pytest.fixture(scope="session")
 def event_loop() -> AsyncIterator[asyncio.AbstractEventLoop]:
     """Create a session-scoped event loop for async tests."""

@@ -17,6 +17,7 @@ from app.core.optimizer import GatewayResult, normalize_routing_mode, run_infere
 from app.db.engine import get_db
 from app.db.models import Agent, AgentSession, InterventionMode, ModelEndpoint
 from app.services.metering import is_budget_exceeded, is_rate_limited
+from app.services.trace_writer import TracePayload, write_trace
 
 router = APIRouter()
 
@@ -200,6 +201,42 @@ async def chat_completions(
     )
     result.model_requested = body.model or (model_endpoint.model_id if model_endpoint else body.model)
 
+    completion_id = f"chatcmpl-{uuid.uuid4().hex[:24]}"
+    if not result.request_id:
+        result.request_id = completion_id
+
+    # Fire background trace persistence — never blocks the response
+    api_key_id = getattr(getattr(request.state, "api_key", None), "id", None)
+    trace_payload = TracePayload(
+        org_id=org_id,
+        agent_id=str(agent.id) if agent else None,
+        agent_session_id=str(session.id) if session else None,
+        request_id=result.request_id,
+        model_requested=result.model_requested,
+        model_used=result.model_used,
+        provider=result.provider,
+        routing_mode=result.routing_mode,
+        intervention_mode=result.intervention_mode,
+        policy_action=result.policy_action,
+        policy_reason=result.policy_reason,
+        cache_hit=result.cache_hit,
+        cache_tier=result.cache_tier,
+        input_tokens=result.input_tokens,
+        output_tokens=result.output_tokens,
+        latency_ms=result.latency_ms,
+        cost_without_asahi=result.cost_without_asahi,
+        cost_with_asahi=result.cost_with_asahi,
+        savings_usd=result.savings_usd,
+        savings_pct=result.savings_pct,
+        model_endpoint_id=str(model_endpoint.id) if model_endpoint else None,
+        api_key_id=str(api_key_id) if api_key_id else None,
+        routing_reason=result.routing_reason,
+        routing_factors=result.routing_factors,
+        routing_confidence=result.routing_confidence,
+        error_message=result.error_message,
+    )
+    asyncio.create_task(write_trace(trace_payload))
+
     if result.error_message:
         return JSONResponse(
             {
@@ -212,9 +249,6 @@ async def chat_completions(
             status_code=500,
         )
 
-    completion_id = f"chatcmpl-{uuid.uuid4().hex[:24]}"
-    if not result.request_id:
-        result.request_id = completion_id
     request.state.inference_result = result
     metadata = _build_metadata(result, body.session_id)
 

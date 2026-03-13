@@ -110,12 +110,36 @@ async def run_inference(
             "The intervention ladder is not yet active in the runtime path."
         )
 
+    # Classify dependency level for context-aware caching
+    dep_level = None
+    try:
+        from app.services.dependency_classifier import DependencyClassifier
+
+        classifier = DependencyClassifier()
+        dep_classification = classifier.classify(prompt)
+        dep_level = dep_classification.level
+    except Exception:
+        logger.debug("Dependency classifier unavailable, defaulting to standard cache")
+
     if redis and org_id:
         try:
             from app.services.cache import RedisCache
 
             cache = RedisCache(redis)
-            hit = await cache.get(org_id, prompt, model=model_override)
+
+            # Use context-aware cache if dependency level is available
+            if dep_level is not None:
+                from app.services.coherence_validator import CoherenceValidator
+
+                validator = CoherenceValidator()
+                hit = await cache.context_get(
+                    org_id, prompt,
+                    dependency_level=dep_level,
+                    model=model_override,
+                    coherence_validator=validator,
+                )
+            else:
+                hit = await cache.get(org_id, prompt, model=model_override)
             if hit:
                 elapsed = int((time.time() - start_time) * 1000)
                 logger.info(
@@ -151,6 +175,23 @@ async def run_inference(
         except Exception:
             logger.exception("Redis cache check failed, falling through to optimizer")
 
+    # Run the routing engine to get model selection and factor breakdown
+    from app.services.routing import RoutingContext, RoutingEngine
+
+    routing_ctx = RoutingContext(
+        prompt=prompt,
+        routing_mode=normalized_routing_mode,
+        quality_preference=quality_preference or "high",
+        latency_preference=latency_preference or "normal",
+        model_override=model_override,
+        provider_hint=provider_hint,
+    )
+    routing_engine = RoutingEngine()
+    routing_decision = routing_engine.route(routing_ctx)
+
+    # Use routing decision to inform the model override if AUTO mode selected a model
+    effective_model = model_override or routing_decision.selected_model
+
     optimizer = get_optimizer_instance(use_mock=use_mock)
     if not optimizer:
         return GatewayResult(
@@ -167,7 +208,7 @@ async def run_inference(
                 routing_mode=_legacy_routing_mode(normalized_routing_mode),
                 quality_preference=quality_preference,
                 latency_preference=latency_preference,
-                model_override=model_override,
+                model_override=effective_model,
                 organization_id=org_id,
             ),
         )
@@ -186,7 +227,7 @@ async def run_inference(
             request_id=getattr(result, "request_id", None),
             model_used=result.model_used,
             model_requested=model_override,
-            provider=provider_hint,
+            provider=routing_decision.selected_provider or provider_hint,
             routing_mode=normalized_routing_mode,
             intervention_mode=intervention_mode.upper(),
             agent_id=agent_id,
@@ -201,12 +242,9 @@ async def run_inference(
             cache_hit=result.cache_hit,
             cache_tier=cache_tier,
             latency_ms=elapsed,
-            routing_reason=result.routing_reason,
-            routing_factors={
-                "legacy_mode": _legacy_routing_mode(normalized_routing_mode),
-                "quality_preference": quality_preference,
-                "latency_preference": latency_preference,
-            },
+            routing_reason=routing_decision.reason,
+            routing_factors=routing_decision.factors,
+            routing_confidence=routing_decision.confidence,
             policy_action="observe_only",
             policy_reason=policy_reason,
         )

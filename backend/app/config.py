@@ -86,6 +86,21 @@ class Settings(BaseSettings):
     stripe_webhook_secret: Optional[str] = None
     stripe_pro_price_id: Optional[str] = None
 
+    # Pinecone (semantic cache vector store)
+    pinecone_api_key: Optional[str] = None
+    pinecone_index_name: str = "asahio-semantic-cache"
+    pinecone_environment: str = "us-east-1"
+
+    # Cohere (production embeddings)
+    cohere_api_key: Optional[str] = None
+
+    # Embedding provider: "cohere" (production) or "local" (dev)
+    embedding_provider: str = "local"
+    embedding_dimensions: int = 1024  # Cohere embed-english-v3.0
+
+    # Encryption
+    fernet_key: Optional[str] = None
+
     # Email
     resend_api_key: Optional[str] = None
 

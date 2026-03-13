@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
+import logging
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Optional
@@ -12,6 +14,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
 from app.db.models import BillingAccount, BillingStatus, Organisation, PlanTier
+
+logger = logging.getLogger(__name__)
 
 try:
     import stripe
@@ -200,21 +204,56 @@ async def list_invoices(org: Organisation) -> list[dict[str, Any]]:
     return rows
 
 
-async def record_stripe_usage(org: Organisation, token_count: int, event_id: str) -> None:
+async def record_stripe_usage(
+    org: Organisation,
+    token_count: int,
+    event_id: str,
+    max_retries: int = 3,
+) -> None:
+    """Record token usage as a Stripe billing meter event.
+
+    Retries with exponential backoff on failure. After all retries
+    are exhausted the error is logged but never propagated.
+    """
     if token_count <= 0 or not _init_stripe() or not org.stripe_customer_id:
         return
 
-    try:
-        stripe.billing.MeterEvent.create(
-            event_name="asahio_tokens",
-            payload={
-                "value": str(token_count),
-                "stripe_customer_id": org.stripe_customer_id,
-            },
-            identifier=event_id,
-        )
-    except Exception:
-        return
+    for attempt in range(1, max_retries + 1):
+        try:
+            stripe.billing.MeterEvent.create(
+                event_name="asahio_tokens",
+                payload={
+                    "value": str(token_count),
+                    "stripe_customer_id": org.stripe_customer_id,
+                },
+                identifier=event_id,
+            )
+            return  # success
+        except Exception as exc:
+            if attempt < max_retries:
+                logger.warning(
+                    "Stripe meter event attempt %d/%d failed for org %s: %s",
+                    attempt,
+                    max_retries,
+                    org.id,
+                    exc,
+                )
+                await asyncio.sleep(2 ** (attempt - 1))  # 1s, 2s
+            else:
+                logger.error(
+                    "Stripe meter event failed after %d attempts for org %s, "
+                    "event_id=%s, tokens=%d: %s",
+                    max_retries,
+                    org.id,
+                    event_id,
+                    token_count,
+                    exc,
+                    extra={
+                        "org_id": str(org.id),
+                        "event_id": event_id,
+                        "tokens": token_count,
+                    },
+                )
 
 
 async def handle_webhook(
@@ -289,4 +328,46 @@ async def handle_webhook(
         except Exception:
             pass
     return {"received": True, "type": event_type}
+
+
+# -- Usage threshold alerts ------------------------------------------------
+
+from dataclasses import dataclass
+
+
+@dataclass
+class UsageAlert:
+    """An alert when usage crosses a threshold."""
+
+    threshold_pct: int
+    resource: str  # "requests" or "tokens"
+    current: int
+    limit: int
+
+
+def check_usage_thresholds(
+    current_requests: int,
+    request_limit: int,
+    current_tokens: int,
+    token_limit: int,
+) -> list[UsageAlert]:
+    """Check if usage crosses 80% or 100% thresholds.
+
+    Returns a list of alerts for any thresholds exceeded.
+    """
+    alerts: list[UsageAlert] = []
+
+    for resource, current, limit in [
+        ("requests", current_requests, request_limit),
+        ("tokens", current_tokens, token_limit),
+    ]:
+        if limit <= 0:
+            continue
+        pct = (current / limit) * 100
+        if pct >= 100:
+            alerts.append(UsageAlert(threshold_pct=100, resource=resource, current=current, limit=limit))
+        elif pct >= 80:
+            alerts.append(UsageAlert(threshold_pct=80, resource=resource, current=current, limit=limit))
+
+    return alerts
 

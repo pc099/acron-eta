@@ -44,9 +44,9 @@ async def test_keys_crud_lifecycle(
     assert rotated["id"]
     assert rotated["raw_key"].startswith("asahio_")
 
-    new_raw_key = created["raw_key"]
-    rotated_id = rotated["id"]
+    rotated_raw_key = rotated["raw_key"]
+    created_id = created["id"]
     delete_resp = await client.delete(
-        f"/keys/{rotated_id}", headers=_auth_header(new_raw_key)
+        f"/keys/{created_id}", headers=_auth_header(rotated_raw_key)
     )
     assert delete_resp.status_code == 204

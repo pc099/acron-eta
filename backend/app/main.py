@@ -1,5 +1,6 @@
 ﻿"""FastAPI application factory for the ASAHIO backend."""
 
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 
@@ -9,10 +10,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 from sqlalchemy.exc import ProgrammingError
 
-from app.api import admin, agents, analytics, auth, billing, gateway, governance, keys, models, orgs, routing
+from app.api import admin, agents, analytics, auth, billing, gateway, governance, keys, models, orgs, routing, traces
 from app.config import get_settings
 from app.db import engine as _db_engine_mod
 from app.db.models import Base
+from app.middleware.audit import AuditMiddleware
 from app.middleware.auth import AuthMiddleware
 from app.middleware.cors_preflight import CORSPreflightMiddleware
 from app.middleware.metering import MeteringMiddleware
@@ -114,9 +116,22 @@ async def lifespan(app: FastAPI):
         logger.warning("Redis not available - rate limiting and caching disabled")
         app.state.redis = None
 
+    # Start provider health poller as background task
+    health_task = None
+    try:
+        from app.services.provider_health import poll_provider_health
+        health_task = asyncio.create_task(
+            poll_provider_health(redis=app.state.redis)
+        )
+        logger.info("Provider health poller started")
+    except Exception:
+        logger.warning("Provider health poller failed to start")
+
     yield
 
     # Shutdown
+    if health_task and not health_task.done():
+        health_task.cancel()
     if app.state.redis:
         await app.state.redis.close()
     await _db_engine_mod.engine.dispose()
@@ -133,6 +148,20 @@ def create_app() -> FastAPI:
         docs_url="/docs" if settings.api_docs_enabled else None,
         redoc_url="/redoc" if settings.api_docs_enabled else None,
         openapi_url="/openapi.json" if settings.api_docs_enabled else None,
+        openapi_tags=[
+            {"name": "gateway", "description": "LLM inference gateway — observe, route, cache"},
+            {"name": "agents", "description": "Agent lifecycle management"},
+            {"name": "models", "description": "Model registry and BYOM endpoints"},
+            {"name": "routing", "description": "Routing constraints and guided rules"},
+            {"name": "traces", "description": "Call traces and session observability"},
+            {"name": "billing", "description": "Subscription management and usage tracking"},
+            {"name": "api-keys", "description": "API key provisioning and revocation"},
+            {"name": "analytics", "description": "Cost, latency, and usage analytics"},
+            {"name": "governance", "description": "Policies, compliance, and audit"},
+            {"name": "organisations", "description": "Organisation CRUD and membership"},
+            {"name": "auth", "description": "Authentication and session management"},
+            {"name": "admin", "description": "Platform administration"},
+        ],
     )
 
     # CORS: last added runs first. Preflight handles OPTIONS with 200; CORSMiddleware adds headers to other responses.
@@ -149,6 +178,7 @@ def create_app() -> FastAPI:
         allow_credentials,
     )
 
+    app.add_middleware(AuditMiddleware)
     app.add_middleware(MeteringMiddleware)
     app.add_middleware(RateLimitMiddleware)
     app.add_middleware(AuthMiddleware)
@@ -180,6 +210,7 @@ def create_app() -> FastAPI:
     app.include_router(keys.router, prefix="/keys", tags=["api-keys"])
     app.include_router(analytics.router, prefix="/analytics", tags=["analytics"])
     app.include_router(governance.router, prefix="/governance", tags=["governance"])
+    app.include_router(traces.router, tags=["traces"])
     app.include_router(admin.router, prefix="/admin", tags=["admin"])
 
     @app.get("/health")

@@ -2,13 +2,18 @@
 
 import Link from "next/link";
 import {
+  Activity,
   BarChart2,
   BookOpen,
+  Bot,
   CreditCard,
   Database,
+  GitBranch,
   Key,
   LayoutDashboard,
+  Server,
   Settings,
+  Shield,
   Zap,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -16,10 +21,15 @@ import { cn } from "@/lib/utils";
 const navItems = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
   { icon: Zap, label: "Gateway", path: "/gateway" },
+  { icon: Bot, label: "Agents", path: "/agents" },
   { icon: Database, label: "Cache", path: "/cache" },
+  { icon: Activity, label: "Traces", path: "/traces" },
   { icon: BarChart2, label: "Analytics", path: "/analytics" },
+  { icon: GitBranch, label: "Routing", path: "/routing" },
+  { icon: Server, label: "Models", path: "/models" },
   { icon: CreditCard, label: "Billing", path: "/billing" },
   { icon: Key, label: "API Keys", path: "/keys" },
+  { icon: Shield, label: "Governance", path: "/governance" },
   { icon: BookOpen, label: "Docs", path: "/docs" },
 ];
 

@@ -17,7 +17,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.engine import get_db
-from app.db.models import ApiKey, KeyEnvironment
+from app.db.models import ApiKey, KeyEnvironment, MemberRole
+from app.middleware.rbac import require_role
 from app.services.audit import write_audit
 
 router = APIRouter()
@@ -105,7 +106,7 @@ async def list_keys(request: Request, db: AsyncSession = Depends(get_db)):
     ]
 
 
-@router.post("", response_model=KeyCreateResponse, status_code=201)
+@router.post("", response_model=KeyCreateResponse, status_code=201, dependencies=[require_role(MemberRole.ADMIN)])
 async def create_key(body: KeyCreateRequest, request: Request, db: AsyncSession = Depends(get_db)):
     """Create a new API key. Returns the raw key ONCE — it cannot be retrieved again."""
     org_id = _get_org_id(request)
@@ -183,7 +184,7 @@ async def update_key(
     }
 
 
-@router.delete("/{key_id}", status_code=204)
+@router.delete("/{key_id}", status_code=204, dependencies=[require_role(MemberRole.ADMIN)])
 async def revoke_key(key_id: str, request: Request, db: AsyncSession = Depends(get_db)):
     """Revoke an API key (soft delete — sets is_active=False)."""
     org_id = _get_org_id(request)

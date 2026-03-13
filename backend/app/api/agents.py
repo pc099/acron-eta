@@ -6,13 +6,14 @@ import re
 import uuid
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
-from sqlalchemy import select
+from sqlalchemy import case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.engine import get_db
-from app.db.models import Agent, AgentSession, InterventionMode, ModelEndpoint, RoutingMode
+from app.db.models import Agent, AgentSession, CallTrace, InterventionMode, MemberRole, ModelEndpoint, RoutingMode
+from app.middleware.rbac import require_role
 
 router = APIRouter()
 
@@ -107,7 +108,7 @@ async def list_agents(request: Request, db: AsyncSession = Depends(get_db)) -> d
     return {"data": [_serialize_agent(agent) for agent in agents]}
 
 
-@router.post("", status_code=201)
+@router.post("", status_code=201, dependencies=[require_role(MemberRole.ADMIN)])
 async def create_agent(
     body: AgentCreateRequest, request: Request, db: AsyncSession = Depends(get_db)
 ) -> dict:
@@ -145,7 +146,7 @@ async def get_agent(agent_id: str, request: Request, db: AsyncSession = Depends(
     return _serialize_agent(agent)
 
 
-@router.patch("/{agent_id}")
+@router.patch("/{agent_id}", dependencies=[require_role(MemberRole.ADMIN)])
 async def update_agent(
     agent_id: str, body: AgentUpdateRequest, request: Request, db: AsyncSession = Depends(get_db)
 ) -> dict:
@@ -210,4 +211,66 @@ async def create_agent_session(
         "external_session_id": session.external_session_id,
         "started_at": session.started_at.isoformat(),
         "last_seen_at": session.last_seen_at.isoformat() if session.last_seen_at else None,
+    }
+
+
+@router.post("/{agent_id}/archive", dependencies=[require_role(MemberRole.ADMIN)])
+async def archive_agent(
+    agent_id: str, request: Request, db: AsyncSession = Depends(get_db)
+) -> dict:
+    """Archive an agent by setting is_active=False."""
+    org_id = await _get_org_id(request)
+    agent = await db.get(Agent, uuid.UUID(agent_id))
+    if not agent or agent.organisation_id != org_id:
+        raise HTTPException(status_code=404, detail="Agent not found")
+
+    agent.is_active = False
+    await db.flush()
+    await db.refresh(agent)
+    return _serialize_agent(agent)
+
+
+@router.get("/{agent_id}/stats")
+async def get_agent_stats(
+    agent_id: str, request: Request, db: AsyncSession = Depends(get_db)
+) -> dict:
+    """Get aggregate stats for an agent from its call traces."""
+    org_id = await _get_org_id(request)
+    agent = await db.get(Agent, uuid.UUID(agent_id))
+    if not agent or agent.organisation_id != org_id:
+        raise HTTPException(status_code=404, detail="Agent not found")
+
+    result = await db.execute(
+        select(
+            func.count(CallTrace.id).label("total_calls"),
+            func.sum(case((CallTrace.cache_hit.is_(True), 1), else_=0)).label("cache_hits"),
+            func.avg(CallTrace.latency_ms).label("avg_latency_ms"),
+            func.sum(CallTrace.input_tokens).label("total_input_tokens"),
+            func.sum(CallTrace.output_tokens).label("total_output_tokens"),
+        ).where(
+            CallTrace.agent_id == agent.id,
+            CallTrace.organisation_id == org_id,
+        )
+    )
+    row = result.one()
+
+    total_calls = row[0] or 0
+    cache_hits = int(row[1] or 0)
+    session_count_result = await db.execute(
+        select(func.count(AgentSession.id)).where(
+            AgentSession.agent_id == agent.id,
+            AgentSession.organisation_id == org_id,
+        )
+    )
+    session_count = session_count_result.scalar() or 0
+
+    return {
+        "agent_id": str(agent.id),
+        "total_calls": total_calls,
+        "cache_hits": cache_hits,
+        "cache_hit_rate": round(cache_hits / total_calls, 4) if total_calls > 0 else 0.0,
+        "avg_latency_ms": round(float(row[2]), 2) if row[2] else None,
+        "total_input_tokens": int(row[3] or 0),
+        "total_output_tokens": int(row[4] or 0),
+        "total_sessions": session_count,
     }

@@ -634,6 +634,41 @@ class AuditLog(Base):
     )
 
 
+class RoutingConstraint(Base):
+    """Persisted routing rule for GUIDED mode, scoped to org or agent."""
+
+    __tablename__ = "routing_constraints"
+    __table_args__ = (
+        Index("ix_routing_constraints_org_id", "organisation_id"),
+        Index("ix_routing_constraints_agent_id", "agent_id"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    organisation_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("organisations.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    agent_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("agents.id", ondelete="CASCADE"), nullable=True
+    )
+    rule_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    rule_config: Mapped[dict] = mapped_column("rule_config", JSONB, nullable=False)
+    priority: Mapped[int] = mapped_column(Integer, default=0)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    organisation: Mapped["Organisation"] = relationship("Organisation")
+    agent: Mapped[Optional["Agent"]] = relationship("Agent")
+
+
 class Invitation(Base):
     """Pending invitation to join an organisation."""
 

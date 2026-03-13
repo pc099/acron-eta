@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import uuid
 from typing import Optional
 
@@ -12,9 +13,21 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.engine import get_db
-from app.db.models import ModelEndpoint, ModelEndpointType
+from app.db.models import MemberRole, ModelEndpoint, ModelEndpointType
+from app.middleware.rbac import require_role
+from app.services.encryption import encrypt_secret
 
 router = APIRouter()
+
+
+def _encrypt_if_present(value: Optional[str]) -> Optional[str]:
+    """Encrypt a secret reference if provided."""
+    if value is None:
+        return None
+    try:
+        return encrypt_secret(value)
+    except Exception:
+        return value
 
 
 class ModelEndpointRequest(BaseModel):
@@ -99,13 +112,20 @@ async def list_model_endpoints(request: Request, db: AsyncSession = Depends(get_
     return {"data": [_serialize_endpoint(endpoint) for endpoint in endpoints]}
 
 
-@router.post("/register", status_code=201)
+@router.post("/register", status_code=201, dependencies=[require_role(MemberRole.ADMIN)])
 async def register_model_endpoint(
     body: ModelEndpointRequest,
     request: Request,
     db: AsyncSession = Depends(get_db),
 ) -> dict:
     org_id = await _get_org_id(request)
+
+    # Validate endpoint URL format when provided
+    if body.endpoint_url:
+        url_pattern = re.compile(r"^https?://[^\s/$.?#].[^\s]*$", re.IGNORECASE)
+        if not url_pattern.match(body.endpoint_url):
+            raise HTTPException(status_code=400, detail="Invalid endpoint URL format")
+
     endpoint = ModelEndpoint(
         organisation_id=org_id,
         name=body.name,
@@ -113,7 +133,7 @@ async def register_model_endpoint(
         provider=body.provider,
         model_id=body.model_id,
         endpoint_url=body.endpoint_url,
-        secret_reference=body.secret_reference,
+        secret_reference=_encrypt_if_present(body.secret_reference),
         default_headers=body.default_headers,
         capability_flags=body.capability_flags,
         fallback_model_id=body.fallback_model_id,
@@ -131,7 +151,7 @@ async def register_model_endpoint(
     return _serialize_endpoint(endpoint)
 
 
-@router.patch("/{endpoint_id}")
+@router.patch("/{endpoint_id}", dependencies=[require_role(MemberRole.ADMIN)])
 async def update_model_endpoint(
     endpoint_id: str,
     body: ModelEndpointUpdateRequest,
@@ -162,7 +182,7 @@ async def update_model_endpoint(
     return _serialize_endpoint(endpoint)
 
 
-@router.delete("/{endpoint_id}", status_code=204)
+@router.delete("/{endpoint_id}", status_code=204, response_model=None, dependencies=[require_role(MemberRole.ADMIN)])
 async def delete_model_endpoint(
     endpoint_id: str,
     request: Request,

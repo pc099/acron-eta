@@ -1,0 +1,4 @@
+interface:
+  display_name: "Asahi Inference Frontier"
+  short_description: "Solve hard Asahi inference-system problems"
+  default_prompt: "Use $asahi-inference-frontier to design and implement a high-leverage improvement for routing, caching, evaluation, or inference reliability in this repo."
