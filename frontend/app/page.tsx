@@ -12,15 +12,14 @@ export default function LandingPage() {
   >("checking");
 
   useEffect(() => {
-    const base = apiBase;
-    if (!base) {
+    if (!apiBase) {
       setEngineStatus("ready");
       return;
     }
-    fetch(`${base.replace(/\/$/, "")}/health`, { method: "GET" })
+    fetch(`${apiBase}/health`, { method: "GET" })
       .then((r) => setEngineStatus(r.ok ? "ready" : "offline"))
       .catch(() => setEngineStatus("offline"));
-  }, []);
+  }, [apiBase]);
 
   return (
     <div className="min-h-screen bg-background text-foreground">

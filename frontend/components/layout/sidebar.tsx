@@ -32,7 +32,7 @@ const navItems = [
   { icon: CreditCard, label: "Billing", path: "/billing" },
   { icon: Key, label: "API Keys", path: "/keys" },
   { icon: Shield, label: "Governance", path: "/governance" },
-  { icon: BookOpen, label: "Docs", path: "/docs" },
+  { icon: BookOpen, label: "Docs", path: "/docs", absolute: true },
 ];
 
 const bottomItems = [
@@ -53,14 +53,15 @@ interface NavProps {
 }
 
 function SidebarNav({ orgSlug, currentPath, onItemClick }: NavProps) {
-  const isActive = (path: string) => currentPath.includes(`/${orgSlug}${path}`);
+  const isActive = (path: string, absolute?: boolean) =>
+    absolute ? currentPath === path : currentPath.includes(`/${orgSlug}${path}`);
 
   return (
     <>
       <nav className="flex-1 space-y-1 px-3 py-4">
         {navItems.map((item) => {
-          const href = `/${orgSlug}${item.path}`;
-          const active = isActive(item.path);
+          const href = (item as { absolute?: boolean }).absolute ? item.path : `/${orgSlug}${item.path}`;
+          const active = isActive(item.path, (item as { absolute?: boolean }).absolute);
           return (
             <Link
               key={item.path}
