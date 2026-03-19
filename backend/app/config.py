@@ -89,6 +89,7 @@ class Settings(BaseSettings):
     # Pinecone (semantic cache vector store)
     pinecone_api_key: Optional[str] = None
     pinecone_index_name: str = "asahio-semantic-cache"
+    pinecone_host: Optional[str] = None  # e.g. "asahio-xxx.svc.aped-1234.pinecone.io"
     pinecone_environment: str = "us-east-1"
 
     # Cohere (production embeddings)

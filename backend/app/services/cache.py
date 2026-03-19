@@ -99,11 +99,16 @@ class RedisCache:
             from pinecone import Pinecone
 
             pc = Pinecone(api_key=settings.pinecone_api_key)
-            self._pinecone_index = pc.Index(settings.pinecone_index_name)
-            logger.info("Connected to Pinecone index: %s", settings.pinecone_index_name)
+            # Prefer host (skips describe_index call) over name lookup
+            if settings.pinecone_host:
+                self._pinecone_index = pc.Index(host=settings.pinecone_host)
+                logger.info("Connected to Pinecone via host: %s", settings.pinecone_host)
+            else:
+                self._pinecone_index = pc.Index(settings.pinecone_index_name)
+                logger.info("Connected to Pinecone index: %s", settings.pinecone_index_name)
             return self._pinecone_index
-        except Exception:
-            logger.warning("Could not connect to Pinecone — semantic cache disabled")
+        except Exception as exc:
+            logger.warning("Could not connect to Pinecone — semantic cache disabled: %s", exc)
             return None
 
     # —— Exact Cache (Tier 1) —————————————————
