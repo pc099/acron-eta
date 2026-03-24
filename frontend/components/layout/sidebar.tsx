@@ -180,9 +180,9 @@ export function Sidebar({
   return (
     <>
       <aside className="hidden w-64 flex-col border-r border-border bg-sidebar md:flex">
-        <div className="flex h-14 items-center gap-2 border-b border-border px-6">
-          <Image src="/asashio_logo-NB.png" alt="ASAHIO" width={28} height={28} className="rounded-md" />
-          <span className="text-lg font-bold text-foreground">ASAHIO</span>
+        <div className="flex h-16 items-center gap-3 border-b border-border px-6">
+          <Image src="/asashio_logo-NB.png" alt="ASAHIO" width={40} height={40} className="rounded-md" />
+          <span className="text-xl font-bold text-foreground">ASAHIO</span>
         </div>
         <SidebarNav orgSlug={orgSlug} currentPath={currentPath} />
         <UsageBars orgSlug={orgSlug} />
@@ -200,9 +200,9 @@ export function Sidebar({
             onClick={onClose}
           />
           <aside className="relative z-50 flex h-full w-64 flex-col border-r border-border bg-sidebar shadow-lg">
-            <div className="flex h-14 items-center gap-2 border-b border-border px-6">
-              <Image src="/asashio_logo-NB.png" alt="ASAHIO" width={28} height={28} className="rounded-md" />
-              <span className="text-lg font-bold text-foreground">ASAHIO</span>
+            <div className="flex h-16 items-center gap-3 border-b border-border px-6">
+              <Image src="/asashio_logo-NB.png" alt="ASAHIO" width={40} height={40} className="rounded-md" />
+              <span className="text-xl font-bold text-foreground">ASAHIO</span>
             </div>
             <SidebarNav
               orgSlug={orgSlug}
