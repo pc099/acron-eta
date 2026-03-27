@@ -68,9 +68,9 @@ class Session:
     agent_id: str
     external_session_id: str
     started_at: str
-    last_seen_at: str
-    total_calls: Optional[int]
-    avg_latency_ms: Optional[float]
+    last_seen_at: Optional[str] = None
+    trace_count: int = 0
+    stats: Optional[dict] = None
 
     @classmethod
     def from_dict(cls, data: dict) -> "Session":
@@ -80,10 +80,15 @@ class Session:
             agent_id=data["agent_id"],
             external_session_id=data["external_session_id"],
             started_at=data["started_at"],
-            last_seen_at=data["last_seen_at"],
-            total_calls=data.get("total_calls"),
-            avg_latency_ms=data.get("avg_latency_ms"),
+            last_seen_at=data.get("last_seen_at"),
+            trace_count=data.get("trace_count", 0),
+            stats=data.get("stats"),
         )
+
+    @property
+    def total_calls(self) -> int:
+        """Alias for trace_count for backward compatibility."""
+        return self.trace_count
 
 
 @dataclass

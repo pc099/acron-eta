@@ -168,8 +168,11 @@ async def update_agent(
     agent_id: str, body: AgentUpdateRequest, request: Request, db: AsyncSession = Depends(get_db)
 ) -> dict:
     org_id = await _get_org_id(request)
-    agent = await db.get(Agent, uuid.UUID(agent_id))
-    if not agent or agent.organisation_id != org_id:
+    result = await db.execute(
+        select(Agent).where(Agent.id == uuid.UUID(agent_id), Agent.organisation_id == org_id)
+    )
+    agent = result.scalar_one_or_none()
+    if not agent:
         raise HTTPException(status_code=404, detail="Agent not found")
 
     await _resolve_model_endpoint(db, org_id, body.model_endpoint_id)
@@ -440,6 +443,7 @@ async def get_mode_history(
         "data": [
             {
                 "id": str(log.id),
+                "agent_id": str(log.agent_id),
                 "previous_mode": log.previous_mode,
                 "new_mode": log.new_mode,
                 "trigger": log.trigger,

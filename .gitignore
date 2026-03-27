@@ -20,3 +20,4 @@ __pycache__/
 .pytest_cache/
 data/baseline_results.json
 data/optimized_results.json
+/scripts/

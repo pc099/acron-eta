@@ -129,8 +129,15 @@ async def get_trace(
 ) -> dict:
     """Get a single call trace with its routing decision."""
     org_id = await _get_org_id(request)
-    trace = await db.get(CallTrace, uuid.UUID(trace_id))
-    if not trace or trace.organisation_id != org_id:
+    try:
+        trace_uuid = uuid.UUID(trace_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid trace_id format")
+    result = await db.execute(
+        select(CallTrace).where(CallTrace.id == trace_uuid, CallTrace.organisation_id == org_id)
+    )
+    trace = result.scalar_one_or_none()
+    if not trace:
         raise HTTPException(status_code=404, detail="Trace not found")
 
     # Fetch associated routing decision
@@ -208,8 +215,15 @@ async def get_session(
 ) -> dict:
     """Get a single session with summary stats."""
     org_id = await _get_org_id(request)
-    session = await db.get(AgentSession, uuid.UUID(session_id))
-    if not session or session.organisation_id != org_id:
+    try:
+        session_uuid = uuid.UUID(session_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid session_id format")
+    result = await db.execute(
+        select(AgentSession).where(AgentSession.id == session_uuid, AgentSession.organisation_id == org_id)
+    )
+    session = result.scalar_one_or_none()
+    if not session:
         raise HTTPException(status_code=404, detail="Session not found")
 
     # Get trace stats for this session
@@ -244,8 +258,15 @@ async def list_session_traces(
 ) -> dict:
     """List all traces for a specific session, ordered chronologically."""
     org_id = await _get_org_id(request)
-    session = await db.get(AgentSession, uuid.UUID(session_id))
-    if not session or session.organisation_id != org_id:
+    try:
+        session_uuid = uuid.UUID(session_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid session_id format")
+    result = await db.execute(
+        select(AgentSession).where(AgentSession.id == session_uuid, AgentSession.organisation_id == org_id)
+    )
+    session = result.scalar_one_or_none()
+    if not session:
         raise HTTPException(status_code=404, detail="Session not found")
 
     result = await db.execute(
@@ -273,8 +294,15 @@ async def get_session_graph(
     Each trace becomes a step; later steps depend on all earlier ones.
     """
     org_id = await _get_org_id(request)
-    session = await db.get(AgentSession, uuid.UUID(session_id))
-    if not session or session.organisation_id != org_id:
+    try:
+        session_uuid = uuid.UUID(session_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid session_id format")
+    result = await db.execute(
+        select(AgentSession).where(AgentSession.id == session_uuid, AgentSession.organisation_id == org_id)
+    )
+    session = result.scalar_one_or_none()
+    if not session:
         raise HTTPException(status_code=404, detail="Session not found")
 
     result = await db.execute(

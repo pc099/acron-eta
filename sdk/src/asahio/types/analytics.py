@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Optional
 
 
@@ -10,21 +10,48 @@ from typing import Optional
 class Overview:
     """Analytics overview KPIs."""
 
+    period: str
     total_requests: int
-    total_cost: float
-    total_savings: float
-    avg_latency_ms: float
+    total_input_tokens: int
+    total_output_tokens: int
+    total_cost_without_asahi: float
+    total_cost_with_asahi: float
+    total_savings_usd: float
+    average_savings_pct: float
     cache_hit_rate: float
+    cache_hits: dict
+    avg_latency_ms: float
+    p99_latency_ms: Optional[int] = None
+    savings_delta_pct: float = 0.0
+    requests_delta_pct: float = 0.0
 
     @classmethod
     def from_dict(cls, data: dict) -> "Overview":
         return cls(
-            total_requests=data["total_requests"],
-            total_cost=data["total_cost"],
-            total_savings=data["total_savings"],
-            avg_latency_ms=data["avg_latency_ms"],
-            cache_hit_rate=data["cache_hit_rate"],
+            period=data.get("period", "30d"),
+            total_requests=data.get("total_requests", 0),
+            total_input_tokens=data.get("total_input_tokens", 0),
+            total_output_tokens=data.get("total_output_tokens", 0),
+            total_cost_without_asahi=data.get("total_cost_without_asahi", 0.0),
+            total_cost_with_asahi=data.get("total_cost_with_asahi", 0.0),
+            total_savings_usd=data.get("total_savings_usd", 0.0),
+            average_savings_pct=data.get("average_savings_pct", 0.0),
+            cache_hit_rate=data.get("cache_hit_rate", 0.0),
+            cache_hits=data.get("cache_hits") or {},
+            avg_latency_ms=data.get("avg_latency_ms", 0.0),
+            p99_latency_ms=data.get("p99_latency_ms"),
+            savings_delta_pct=data.get("savings_delta_pct", 0.0),
+            requests_delta_pct=data.get("requests_delta_pct", 0.0),
         )
+
+    # Convenience aliases
+    @property
+    def total_cost(self) -> float:
+        return self.total_cost_with_asahi
+
+    @property
+    def total_savings(self) -> float:
+        return self.total_savings_usd
 
 
 @dataclass
@@ -63,7 +90,7 @@ class ModelBreakdown:
             model=data["model"],
             requests=data["requests"],
             total_cost=data["total_cost"],
-            total_savings=data["total_savings"],
+            total_savings=data.get("total_savings", 0.0),
         )
 
 

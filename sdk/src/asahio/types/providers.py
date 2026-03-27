@@ -59,25 +59,40 @@ class Chain:
 
 
 @dataclass
+class ChainTestSlotResult:
+    """Result of testing a single slot in a chain."""
+
+    position: int
+    provider: str
+    model: str
+    key_available: bool
+    error: Optional[str] = None
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "ChainTestSlotResult":
+        return cls(
+            position=data["position"],
+            provider=data["provider"],
+            model=data["model"],
+            key_available=data["key_available"],
+            error=data.get("error"),
+        )
+
+
+@dataclass
 class ChainTestResult:
     """Result of testing a GUIDED chain."""
 
     chain_id: str
-    selected_model: str
-    selected_provider: str
-    slot_priority: int
-    test_status: str
-    test_message: Optional[str]
+    ready: bool
+    slots: list[ChainTestSlotResult]
 
     @classmethod
     def from_dict(cls, data: dict) -> "ChainTestResult":
         return cls(
             chain_id=data["chain_id"],
-            selected_model=data["selected_model"],
-            selected_provider=data["selected_provider"],
-            slot_priority=data["slot_priority"],
-            test_status=data["test_status"],
-            test_message=data.get("test_message"),
+            ready=data["ready"],
+            slots=[ChainTestSlotResult.from_dict(s) for s in data.get("slots", [])],
         )
 
 

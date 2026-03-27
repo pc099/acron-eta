@@ -125,7 +125,6 @@ class ModeHistoryEntry:
     """A single mode transition history entry."""
 
     id: str
-    agent_id: str
     previous_mode: str
     new_mode: str
     trigger: str
@@ -133,12 +132,13 @@ class ModeHistoryEntry:
     evidence: dict
     operator_user_id: Optional[str]
     created_at: str
+    agent_id: Optional[str] = None
 
     @classmethod
     def from_dict(cls, data: dict) -> "ModeHistoryEntry":
         return cls(
             id=data["id"],
-            agent_id=data["agent_id"],
+            agent_id=data.get("agent_id"),
             previous_mode=data["previous_mode"],
             new_mode=data["new_mode"],
             trigger=data["trigger"],
@@ -157,7 +157,7 @@ class AgentSession:
     agent_id: str
     external_session_id: str
     started_at: str
-    last_seen_at: str
+    last_seen_at: Optional[str] = None
 
     @classmethod
     def from_dict(cls, data: dict) -> "AgentSession":
@@ -166,5 +166,5 @@ class AgentSession:
             agent_id=data["agent_id"],
             external_session_id=data["external_session_id"],
             started_at=data["started_at"],
-            last_seen_at=data["last_seen_at"],
+            last_seen_at=data.get("last_seen_at"),
         )

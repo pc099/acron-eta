@@ -26,7 +26,7 @@ class Interventions(SyncResource):
             "limit": limit,
             "offset": offset,
         })
-        response = self._client.get("/interventions/logs", params=params)
+        response = self._client.get("/interventions", params=params)
         data = response.json()
         return PaginatedList(
             data=[InterventionLog.from_dict(log) for log in data.get("data", [])],
@@ -46,7 +46,7 @@ class Interventions(SyncResource):
 
     def fleet_overview(self) -> FleetOverview:
         """Get fleet-wide intervention overview."""
-        response = self._client.get("/interventions/fleet/overview")
+        response = self._client.get("/interventions/fleet-overview")
         return FleetOverview.from_dict(response.json())
 
 
@@ -68,7 +68,7 @@ class AsyncInterventions(AsyncResource):
             "limit": limit,
             "offset": offset,
         })
-        response = await self._client.get("/interventions/logs", params=params)
+        response = await self._client.get("/interventions", params=params)
         data = response.json()
         return PaginatedList(
             data=[InterventionLog.from_dict(log) for log in data.get("data", [])],
@@ -88,5 +88,5 @@ class AsyncInterventions(AsyncResource):
 
     async def fleet_overview(self) -> FleetOverview:
         """Get fleet-wide intervention overview."""
-        response = await self._client.get("/interventions/fleet/overview")
+        response = await self._client.get("/interventions/fleet-overview")
         return FleetOverview.from_dict(response.json())

@@ -43,6 +43,8 @@ class Chains(SyncResource):
     def delete(self, chain_id: str) -> dict:
         """Delete a chain."""
         response = self._client.delete(f"/providers/chains/{chain_id}")
+        if response.status_code == 204:
+            return {"status": "deleted"}
         return response.json()
 
     def test(self, chain_id: str, *, prompt: str = "Hello") -> ChainTestResult:
@@ -87,6 +89,8 @@ class AsyncChains(AsyncResource):
     async def delete(self, chain_id: str) -> dict:
         """Delete a chain."""
         response = await self._client.delete(f"/providers/chains/{chain_id}")
+        if response.status_code == 204:
+            return {"status": "deleted"}
         return response.json()
 
     async def test(self, chain_id: str, *, prompt: str = "Hello") -> ChainTestResult:

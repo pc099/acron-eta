@@ -33,18 +33,18 @@ class BillingPlan:
 class Subscription:
     """Organization subscription status."""
 
-    subscription_status: str
     plan: str
-    stripe_customer_id: Optional[str]
-    stripe_subscription_id: Optional[str]
-    current_period_start: Optional[str]
-    current_period_end: Optional[str]
+    subscription_status: Optional[str] = None
+    stripe_customer_id: Optional[str] = None
+    stripe_subscription_id: Optional[str] = None
+    current_period_start: Optional[str] = None
+    current_period_end: Optional[str] = None
 
     @classmethod
     def from_dict(cls, data: dict) -> "Subscription":
         return cls(
-            subscription_status=data["subscription_status"],
-            plan=data["plan"],
+            plan=data.get("plan", data.get("plan_id", "unknown")),
+            subscription_status=data.get("subscription_status", data.get("status")),
             stripe_customer_id=data.get("stripe_customer_id"),
             stripe_subscription_id=data.get("stripe_subscription_id"),
             current_period_start=data.get("current_period_start"),

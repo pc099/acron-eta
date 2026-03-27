@@ -154,14 +154,20 @@ class ChatCompletionChunk:
 
     @classmethod
     def from_dict(cls, data: dict) -> "ChatCompletionChunk":
-        choices = [
-            DeltaChoice(
-                index=choice["index"],
-                delta=Message(**choice.get("delta", {"role": "assistant", "content": ""})),
-                finish_reason=choice.get("finish_reason"),
+        choices = []
+        for choice in data.get("choices", []):
+            delta_data = choice.get("delta") or {}
+            delta = Message(
+                role=delta_data.get("role", "assistant"),
+                content=delta_data.get("content", ""),
+                tool_calls=delta_data.get("tool_calls"),
+                tool_call_id=delta_data.get("tool_call_id"),
             )
-            for choice in data.get("choices", [])
-        ]
+            choices.append(DeltaChoice(
+                index=choice["index"],
+                delta=delta,
+                finish_reason=choice.get("finish_reason"),
+            ))
         return cls(
             id=data["id"],
             object=data["object"],

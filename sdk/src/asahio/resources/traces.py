@@ -8,6 +8,13 @@ from asahio.resources import AsyncResource, PaginatedList, SyncResource, _strip_
 from asahio.types.traces import Session, SessionGraph, SessionStep, Trace
 
 
+def _parse_total(data: dict) -> int:
+    """Extract total from either {total: N} or {pagination: {total: N}} response shapes."""
+    if "pagination" in data and isinstance(data["pagination"], dict):
+        return data["pagination"].get("total", 0)
+    return data.get("total", 0)
+
+
 class Traces(SyncResource):
     """Sync trace resource."""
 
@@ -35,14 +42,14 @@ class Traces(SyncResource):
         data = response.json()
         return PaginatedList(
             data=[Trace.from_dict(t) for t in data.get("data", [])],
-            total=data.get("pagination", {}).get("total", 0),
+            total=_parse_total(data),
             limit=limit,
             offset=offset,
         )
 
     def get_session(self, session_id: str) -> Session:
         """Get a specific session by ID."""
-        response = self._client.get(f"/traces/sessions/{session_id}")
+        response = self._client.get(f"/sessions/{session_id}")
         return Session.from_dict(response.json())
 
     def list_sessions(
@@ -58,23 +65,23 @@ class Traces(SyncResource):
             "limit": limit,
             "offset": offset,
         })
-        response = self._client.get("/traces/sessions", params=params)
+        response = self._client.get("/sessions", params=params)
         data = response.json()
         return PaginatedList(
             data=[Session.from_dict(s) for s in data.get("data", [])],
-            total=data.get("pagination", {}).get("total", 0),
+            total=_parse_total(data),
             limit=limit,
             offset=offset,
         )
 
     def get_session_graph(self, session_id: str) -> SessionGraph:
         """Get session graph visualization data."""
-        response = self._client.get(f"/traces/sessions/{session_id}/graph")
+        response = self._client.get(f"/sessions/{session_id}/graph")
         return SessionGraph.from_dict(response.json())
 
     def list_session_steps(self, session_id: str) -> list[SessionStep]:
-        """List all steps in a session."""
-        response = self._client.get(f"/traces/sessions/{session_id}/steps")
+        """List all traces (steps) in a session."""
+        response = self._client.get(f"/sessions/{session_id}/traces")
         data = response.json()
         return [SessionStep.from_dict(s) for s in data.get("data", [])]
 
@@ -106,14 +113,14 @@ class AsyncTraces(AsyncResource):
         data = response.json()
         return PaginatedList(
             data=[Trace.from_dict(t) for t in data.get("data", [])],
-            total=data.get("pagination", {}).get("total", 0),
+            total=_parse_total(data),
             limit=limit,
             offset=offset,
         )
 
     async def get_session(self, session_id: str) -> Session:
         """Get a specific session by ID."""
-        response = await self._client.get(f"/traces/sessions/{session_id}")
+        response = await self._client.get(f"/sessions/{session_id}")
         return Session.from_dict(response.json())
 
     async def list_sessions(
@@ -129,22 +136,22 @@ class AsyncTraces(AsyncResource):
             "limit": limit,
             "offset": offset,
         })
-        response = await self._client.get("/traces/sessions", params=params)
+        response = await self._client.get("/sessions", params=params)
         data = response.json()
         return PaginatedList(
             data=[Session.from_dict(s) for s in data.get("data", [])],
-            total=data.get("pagination", {}).get("total", 0),
+            total=_parse_total(data),
             limit=limit,
             offset=offset,
         )
 
     async def get_session_graph(self, session_id: str) -> SessionGraph:
         """Get session graph visualization data."""
-        response = await self._client.get(f"/traces/sessions/{session_id}/graph")
+        response = await self._client.get(f"/sessions/{session_id}/graph")
         return SessionGraph.from_dict(response.json())
 
     async def list_session_steps(self, session_id: str) -> list[SessionStep]:
-        """List all steps in a session."""
-        response = await self._client.get(f"/traces/sessions/{session_id}/steps")
+        """List all traces (steps) in a session."""
+        response = await self._client.get(f"/sessions/{session_id}/traces")
         data = response.json()
         return [SessionStep.from_dict(s) for s in data.get("data", [])]

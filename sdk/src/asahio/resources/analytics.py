@@ -46,7 +46,7 @@ class Analytics(SyncResource):
         if end_date is not None:
             params["end_date"] = end_date
 
-        response = self._client.get("/analytics/model-breakdown", params=params if params else None)
+        response = self._client.get("/analytics/models", params=params if params else None)
         data = response.json()
         return [ModelBreakdown.from_dict(m) for m in data.get("data", [])]
 
@@ -66,7 +66,7 @@ class Analytics(SyncResource):
         if end_date is not None:
             params["end_date"] = end_date
 
-        response = self._client.get("/analytics/cache-performance", params=params if params else None)
+        response = self._client.get("/analytics/cache", params=params if params else None)
         return CachePerformance.from_dict(response.json())
 
     def savings(
@@ -128,7 +128,7 @@ class AsyncAnalytics(AsyncResource):
         if end_date is not None:
             params["end_date"] = end_date
 
-        response = await self._client.get("/analytics/model-breakdown", params=params if params else None)
+        response = await self._client.get("/analytics/models", params=params if params else None)
         data = response.json()
         return [ModelBreakdown.from_dict(m) for m in data.get("data", [])]
 
@@ -148,7 +148,7 @@ class AsyncAnalytics(AsyncResource):
         if end_date is not None:
             params["end_date"] = end_date
 
-        response = await self._client.get("/analytics/cache-performance", params=params if params else None)
+        response = await self._client.get("/analytics/cache", params=params if params else None)
         return CachePerformance.from_dict(response.json())
 
     async def savings(

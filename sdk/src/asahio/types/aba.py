@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Optional
 
 
@@ -29,8 +29,8 @@ class Fingerprint:
     @classmethod
     def from_dict(cls, data: dict) -> "Fingerprint":
         return cls(
-            agent_id=data["agent_id"],
-            organisation_id=data["organisation_id"],
+            agent_id=str(data["agent_id"]),
+            organisation_id=str(data["organisation_id"]),
             total_observations=data["total_observations"],
             avg_complexity=data["avg_complexity"],
             avg_context_length=data["avg_context_length"],
@@ -42,8 +42,8 @@ class Fingerprint:
             tool_success_rates=data.get("tool_success_rates"),
             tool_risk_correlation=data.get("tool_risk_correlation"),
             preferred_model_by_tool=data.get("preferred_model_by_tool"),
-            last_updated_at=data["last_updated_at"],
-            created_at=data["created_at"],
+            last_updated_at=str(data["last_updated_at"]),
+            created_at=str(data["created_at"]),
         )
 
 
@@ -53,7 +53,6 @@ class StructuralRecord:
 
     id: str
     agent_id: str
-    organisation_id: str
     call_trace_id: Optional[str]
     query_complexity_score: float
     agent_type_classification: str
@@ -64,14 +63,15 @@ class StructuralRecord:
     cache_hit: bool
     hallucination_detected: bool
     created_at: str
+    organisation_id: Optional[str] = None
 
     @classmethod
     def from_dict(cls, data: dict) -> "StructuralRecord":
         return cls(
-            id=data["id"],
-            agent_id=data["agent_id"],
-            organisation_id=data["organisation_id"],
-            call_trace_id=data.get("call_trace_id"),
+            id=str(data["id"]),
+            agent_id=str(data["agent_id"]),
+            organisation_id=str(data["organisation_id"]) if data.get("organisation_id") else None,
+            call_trace_id=str(data["call_trace_id"]) if data.get("call_trace_id") else None,
             query_complexity_score=data["query_complexity_score"],
             agent_type_classification=data["agent_type_classification"],
             output_type_classification=data["output_type_classification"],
@@ -80,7 +80,7 @@ class StructuralRecord:
             model_used=data["model_used"],
             cache_hit=data["cache_hit"],
             hallucination_detected=data["hallucination_detected"],
-            created_at=data["created_at"],
+            created_at=str(data["created_at"]),
         )
 
 
@@ -88,18 +88,18 @@ class StructuralRecord:
 class RiskPrior:
     """Global risk prior from Model C."""
 
-    agent_type: str
-    complexity_bucket: float
     risk_score: float
-    sample_size: int
+    observation_count: int
+    confidence: float
+    recommended_model: Optional[str] = None
 
     @classmethod
     def from_dict(cls, data: dict) -> "RiskPrior":
         return cls(
-            agent_type=data["agent_type"],
-            complexity_bucket=data["complexity_bucket"],
             risk_score=data["risk_score"],
-            sample_size=data["sample_size"],
+            observation_count=data.get("observation_count", data.get("sample_size", 0)),
+            confidence=data.get("confidence", 0.0),
+            recommended_model=data.get("recommended_model"),
         )
 
 
@@ -107,23 +107,25 @@ class RiskPrior:
 class AnomalyItem:
     """An anomaly detection result."""
 
-    id: str
     agent_id: str
     anomaly_type: str
     severity: str
-    description: str
+    current_value: float
+    baseline_value: float
+    deviation_pct: float
     detected_at: str
-    metadata: dict
+    metadata: dict = field(default_factory=dict)
 
     @classmethod
     def from_dict(cls, data: dict) -> "AnomalyItem":
         return cls(
-            id=data["id"],
-            agent_id=data["agent_id"],
+            agent_id=str(data["agent_id"]),
             anomaly_type=data["anomaly_type"],
             severity=data["severity"],
-            description=data["description"],
-            detected_at=data["detected_at"],
+            current_value=data.get("current_value", 0.0),
+            baseline_value=data.get("baseline_value", 0.0),
+            deviation_pct=data.get("deviation_pct", 0.0),
+            detected_at=str(data["detected_at"]),
             metadata=data.get("metadata") or {},
         )
 
@@ -134,20 +136,20 @@ class ColdStartStatus:
 
     agent_id: str
     is_cold_start: bool
-    observations_collected: int
-    observations_needed: int
-    baseline_confidence: float
-    estimated_days_remaining: Optional[int]
+    total_observations: int
+    cold_start_threshold: int
+    progress_pct: float
+    bootstrap_source: Optional[str] = None
 
     @classmethod
     def from_dict(cls, data: dict) -> "ColdStartStatus":
         return cls(
-            agent_id=data["agent_id"],
+            agent_id=str(data["agent_id"]),
             is_cold_start=data["is_cold_start"],
-            observations_collected=data["observations_collected"],
-            observations_needed=data["observations_needed"],
-            baseline_confidence=data["baseline_confidence"],
-            estimated_days_remaining=data.get("estimated_days_remaining"),
+            total_observations=data["total_observations"],
+            cold_start_threshold=data.get("cold_start_threshold", 10),
+            progress_pct=data.get("progress_pct", 0.0),
+            bootstrap_source=data.get("bootstrap_source"),
         )
 
 
@@ -156,17 +158,25 @@ class OrgOverview:
     """Organization-wide ABA overview."""
 
     total_agents: int
-    agents_in_cold_start: int
     total_observations: int
     avg_baseline_confidence: float
+    avg_hallucination_rate: float
+    avg_cache_hit_rate: float
+    cold_start_agents: int
+    anomaly_count: int
     top_anomalies: list[AnomalyItem]
+    hallucination_distribution: dict = field(default_factory=dict)
 
     @classmethod
     def from_dict(cls, data: dict) -> "OrgOverview":
         return cls(
             total_agents=data["total_agents"],
-            agents_in_cold_start=data["agents_in_cold_start"],
             total_observations=data["total_observations"],
-            avg_baseline_confidence=data["avg_baseline_confidence"],
+            avg_baseline_confidence=data.get("avg_baseline_confidence", 0.0),
+            avg_hallucination_rate=data.get("avg_hallucination_rate", 0.0),
+            avg_cache_hit_rate=data.get("avg_cache_hit_rate", 0.0),
+            cold_start_agents=data.get("cold_start_agents", 0),
+            anomaly_count=data.get("anomaly_count", 0),
             top_anomalies=[AnomalyItem.from_dict(a) for a in data.get("top_anomalies", [])],
+            hallucination_distribution=data.get("hallucination_distribution") or {},
         )

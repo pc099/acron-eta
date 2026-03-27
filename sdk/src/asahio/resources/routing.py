@@ -14,19 +14,26 @@ class Routing(SyncResource):
     def dry_run(
         self,
         *,
-        prompt: str,
-        agent_id: Optional[str] = None,
-        constraints: Optional[dict[str, Any]] = None,
+        rule_type: str,
+        rule_config: dict,
+        prompt: str = "Test prompt for dry-run",
+        session_step: Optional[int] = None,
+        utc_hour: Optional[int] = None,
     ) -> DryRunResult:
-        """Dry run routing decision without executing."""
-        body: dict[str, Any] = {"prompt": prompt}
-        if agent_id is not None:
-            body["agent_id"] = agent_id
-        if constraints is not None:
-            body["constraints"] = constraints
+        """Dry run a routing rule without executing."""
+        body: dict[str, Any] = {
+            "rule_type": rule_type,
+            "rule_config": rule_config,
+            "prompt": prompt,
+        }
+        if session_step is not None:
+            body["session_step"] = session_step
+        if utc_hour is not None:
+            body["utc_hour"] = utc_hour
 
-        response = self._client.post("/routing/dry-run", json=body)
-        return DryRunResult.from_dict(response.json())
+        response = self._client.post("/routing/rules/dry-run", json=body)
+        data = response.json()
+        return DryRunResult.from_dict(data.get("data", data))
 
     def get_decision(self, call_id: str) -> RoutingDecision:
         """Get routing decision for a specific call."""
@@ -54,12 +61,13 @@ class Routing(SyncResource):
         """Create a new routing constraint."""
         body = {
             "agent_id": agent_id,
-            "constraint_type": constraint_type,
-            "value": value,
+            "rule_type": constraint_type,
+            "rule_config": value if isinstance(value, dict) else {"value": value},
             "priority": priority,
         }
         response = self._client.post("/routing/constraints", json=body)
-        return RoutingConstraint.from_dict(response.json())
+        data = response.json()
+        return RoutingConstraint.from_dict(data.get("data", data))
 
     def delete_constraint(self, constraint_id: str) -> dict:
         """Delete a routing constraint."""
@@ -73,19 +81,27 @@ class AsyncRouting(AsyncResource):
     async def dry_run(
         self,
         *,
-        prompt: str,
-        agent_id: Optional[str] = None,
-        constraints: Optional[dict[str, Any]] = None,
+        rule_type: str,
+        rule_config: dict,
+        prompt: str = "Test prompt for dry-run",
+        session_step: Optional[int] = None,
+        utc_hour: Optional[int] = None,
     ) -> DryRunResult:
-        """Dry run routing decision without executing."""
-        body: dict[str, Any] = {"prompt": prompt}
-        if agent_id is not None:
-            body["agent_id"] = agent_id
-        if constraints is not None:
-            body["constraints"] = constraints
+        """Dry run a routing rule without executing."""
+        body: dict[str, Any] = {
+            "rule_type": rule_type,
+            "rule_config": rule_config,
+            "prompt": prompt,
+        }
+        if session_step is not None:
+            body["session_step"] = session_step
+        if utc_hour is not None:
+            body["utc_hour"] = utc_hour
 
-        response = await self._client.post("/routing/dry-run", json=body)
-        return DryRunResult.from_dict(response.json())
+        response = await self._client.post("/routing/rules/dry-run", json=body)
+        data = response.json()
+        # Backend wraps result in {"data": {...}}
+        return DryRunResult.from_dict(data.get("data", data))
 
     async def get_decision(self, call_id: str) -> RoutingDecision:
         """Get routing decision for a specific call."""
@@ -113,12 +129,13 @@ class AsyncRouting(AsyncResource):
         """Create a new routing constraint."""
         body = {
             "agent_id": agent_id,
-            "constraint_type": constraint_type,
-            "value": value,
+            "rule_type": constraint_type,
+            "rule_config": value if isinstance(value, dict) else {"value": value},
             "priority": priority,
         }
         response = await self._client.post("/routing/constraints", json=body)
-        return RoutingConstraint.from_dict(response.json())
+        data = response.json()
+        return RoutingConstraint.from_dict(data.get("data", data))
 
     async def delete_constraint(self, constraint_id: str) -> dict:
         """Delete a routing constraint."""
