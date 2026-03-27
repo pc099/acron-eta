@@ -4,6 +4,7 @@ Runs as a background task (asyncio.create_task) so it never blocks the
 gateway critical path. Each write gets its own DB session.
 """
 
+import asyncio
 import logging
 import uuid
 from dataclasses import dataclass
@@ -64,6 +65,12 @@ class TracePayload:
     mcp_servers_used: Optional[dict] = None
     computer_use_enabled: bool = False
     chain_id: Optional[str] = None
+
+    # ABA / Model C observation fields
+    agent_type: Optional[str] = None  # CHATBOT, RAG, CODING, etc.
+    complexity_score: Optional[float] = None  # 0.0-1.0
+    output_type: Optional[str] = None  # FACTUAL, CODE, CONVERSATIONAL, etc.
+    hallucination_detected: bool = False
 
 
 def _to_uuid(value: Optional[str]) -> Optional[uuid.UUID]:
@@ -209,6 +216,9 @@ async def write_trace(payload: TracePayload) -> None:
                 routing_decision.id,
             )
 
+            # Write behavioral observation to Model C pool (fire-and-forget)
+            asyncio.create_task(_write_model_c_observation(payload, org_uuid))
+
             # Publish to SSE live trace subscribers
             try:
                 from app.api.traces import publish_trace_event
@@ -255,3 +265,81 @@ async def write_trace(payload: TracePayload) -> None:
             )
         except Exception:
             logger.error("Failed to send trace write failure alert")
+
+
+async def _write_model_c_observation(
+    payload: TracePayload,
+    org_id: uuid.UUID,
+) -> None:
+    """Write behavioral observation to Model C pool (fire-and-forget background task).
+
+    Extracts behavioral signals from the trace and writes them to the Model C
+    Pinecone index for cross-org pattern learning. Privacy-preserving — no org_id
+    or agent_id stored in Model C, only anonymized behavioral patterns.
+
+    Args:
+        payload: The trace payload with behavioral signals.
+        org_id: Organisation UUID (used only for privacy threshold check).
+    """
+    try:
+        from sqlalchemy import func, select
+
+        from app.db.models import CallTrace
+        from app.services.model_c_pool import ModelCPool, PoolRecord
+        from app.services.pinecone_provisioner import get_model_c_index
+
+        # Get org observation count (for privacy threshold — minimum 50 observations)
+        async with async_session_factory() as db:
+            result = await db.execute(
+                select(func.count(CallTrace.id)).where(CallTrace.organisation_id == org_id)
+            )
+            org_count = result.scalar() or 0
+
+        # Derive agent_type (default to CHATBOT if not classified)
+        agent_type = payload.agent_type or "CHATBOT"
+
+        # Derive complexity from risk_score (normalize to 0.0-1.0)
+        # risk_score is typically 0.0-1.0, so use it directly
+        complexity = payload.complexity_score or payload.risk_score or 0.5
+        complexity = max(0.0, min(1.0, float(complexity)))  # Clamp to [0.0, 1.0]
+
+        # Derive output_type (default to CONVERSATIONAL)
+        output_type = payload.output_type or "CONVERSATIONAL"
+
+        # Build observation record
+        record = PoolRecord(
+            agent_type=agent_type,
+            complexity_bucket=ModelCPool._bucket_complexity(complexity),
+            output_type=output_type,
+            model_used=payload.model_used or "unknown",
+            hallucination_detected=payload.hallucination_detected,
+            cache_hit=payload.cache_hit,
+            latency_ms=payload.latency_ms,
+        )
+
+        # Write to Model C pool (with privacy threshold check)
+        pool = ModelCPool(pinecone_index=get_model_c_index())
+        success = await pool.conditional_add(
+            org_id=str(org_id),
+            org_observation_count=org_count,
+            record=record,
+        )
+
+        if success:
+            logger.debug(
+                "Model C observation written: org=%s count=%d type=%s complexity=%.1f",
+                org_id,
+                org_count,
+                agent_type,
+                complexity,
+            )
+        else:
+            logger.debug(
+                "Model C observation skipped: org=%s count=%d (below privacy threshold or write failed)",
+                org_id,
+                org_count,
+            )
+
+    except Exception:
+        logger.exception("Failed to write Model C observation for org %s", org_id)
+        # Don't raise — this is fire-and-forget background task

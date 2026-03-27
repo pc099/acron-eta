@@ -341,6 +341,11 @@ async def chat_completions(
         mcp_servers_used=mcp_servers_used,
         computer_use_enabled=body.enable_computer_use,
         chain_id=body.chain_id,
+        # ABA / Model C observation fields
+        agent_type=result.agent_type,
+        complexity_score=result.complexity_score or result.risk_score,
+        output_type=result.output_type,
+        hallucination_detected=result.hallucination_detected,
     )
 
     # Enqueue trace write with arq (retryable background task)

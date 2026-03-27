@@ -128,6 +128,11 @@ class GatewayResult:
     tool_call_count: int = 0
     # Cache decision metadata for debugging
     cache_metadata: Optional[dict] = None
+    # ABA / Model C observation fields
+    agent_type: Optional[str] = None  # CHATBOT, RAG, CODING, etc.
+    complexity_score: Optional[float] = None  # 0.0-1.0 (use risk_score if not set)
+    output_type: Optional[str] = None  # FACTUAL, CODE, CONVERSATIONAL, etc.
+    hallucination_detected: bool = False
 
 
 def normalize_routing_mode(value: Optional[str]) -> str:
