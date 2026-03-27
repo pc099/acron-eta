@@ -228,6 +228,7 @@ resp = client.chat.completions.create(
             <thead className="border-b border-border bg-muted/50">
               <tr>
                 <th className="px-4 py-3 font-medium text-muted-foreground">Name</th>
+                <th className="px-4 py-3 font-medium text-muted-foreground">Agent ID</th>
                 <th className="px-4 py-3 font-medium text-muted-foreground">Slug</th>
                 <th className="px-4 py-3 font-medium text-muted-foreground">Routing</th>
                 <th className="px-4 py-3 font-medium text-muted-foreground">Intervention</th>
@@ -252,6 +253,7 @@ resp = client.chat.completions.create(
                       </span>
                     )}
                   </td>
+                  <td className="px-4 py-3 font-mono text-xs text-muted-foreground select-all">{agent.id}</td>
                   <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{agent.slug}</td>
                   <td className="px-4 py-3">
                     <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${MODE_BADGE[agent.routing_mode] ?? ""}`}>
