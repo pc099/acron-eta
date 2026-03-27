@@ -428,43 +428,73 @@ async def get_provider_health_dashboard(request: Request):
 
     This endpoint is used by the provider health dashboard in the frontend.
     """
-    from app.services.provider_health import get_all_provider_health
-    from app.core.optimizer import _provider_circuits
+    import datetime
+    import logging
 
-    # Get provider health from health checker
-    provider_health = get_all_provider_health()
+    logger = logging.getLogger(__name__)
 
-    # Build comprehensive health status
-    health_status = []
+    try:
+        from app.services.provider_health import get_all_provider_health
+        from app.core.optimizer import _provider_circuits
 
-    for provider, health in provider_health.items():
-        # Get circuit breaker state if it exists
-        circuit = _provider_circuits.get(provider)
+        # Get provider health from health checker
+        provider_health = get_all_provider_health()
 
-        circuit_info = {
-            "state": "CLOSED",
-            "failure_count": 0,
-            "recovery_remaining_seconds": 0,
+        # Build comprehensive health status
+        health_status = []
+
+        for provider, health in provider_health.items():
+            try:
+                # Get circuit breaker state if it exists
+                circuit = _provider_circuits.get(provider)
+
+                circuit_info = {
+                    "state": "CLOSED",
+                    "failure_count": 0,
+                    "recovery_remaining_seconds": 0,
+                }
+
+                if circuit:
+                    try:
+                        circuit_info = {
+                            "state": circuit.state.value,
+                            "failure_count": circuit._failure_count,
+                            "recovery_remaining_seconds": round(circuit.recovery_remaining(), 1),
+                        }
+                    except Exception as e:
+                        logger.warning(f"Failed to get circuit breaker state for {provider}: {e}")
+
+                health_status.append({
+                    "provider": provider,
+                    "health": health,
+                    "circuit_breaker": circuit_info,
+                    "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+                })
+            except Exception as e:
+                logger.warning(f"Failed to process provider {provider}: {e}")
+                # Add provider with minimal info
+                health_status.append({
+                    "provider": provider,
+                    "health": "unknown",
+                    "circuit_breaker": {"state": "CLOSED", "failure_count": 0, "recovery_remaining_seconds": 0},
+                    "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+                })
+
+        return {
+            "providers": health_status,
+            "total_providers": len(health_status),
+            "healthy_count": sum(1 for p in health_status if p.get("health") == "healthy"),
+            "degraded_count": sum(1 for p in health_status if p.get("health") == "degraded"),
+            "unreachable_count": sum(1 for p in health_status if p.get("health") == "unreachable"),
         }
-
-        if circuit:
-            circuit_info = {
-                "state": circuit.state.value,
-                "failure_count": circuit._failure_count,
-                "recovery_remaining_seconds": round(circuit.recovery_remaining(), 1),
-            }
-
-        health_status.append({
-            "provider": provider,
-            "health": health,
-            "circuit_breaker": circuit_info,
-            "timestamp": __import__("datetime").datetime.now(__import__("datetime").timezone.utc).isoformat(),
-        })
-
-    return {
-        "providers": health_status,
-        "total_providers": len(health_status),
-        "healthy_count": sum(1 for p in health_status if p["health"] == "healthy"),
-        "degraded_count": sum(1 for p in health_status if p["health"] == "degraded"),
-        "unreachable_count": sum(1 for p in health_status if p["health"] == "unreachable"),
-    }
+    except Exception as e:
+        logger.exception("Failed to get provider health dashboard")
+        # Return empty response instead of crashing
+        return {
+            "providers": [],
+            "total_providers": 0,
+            "healthy_count": 0,
+            "degraded_count": 0,
+            "unreachable_count": 0,
+            "error": str(e),
+        }

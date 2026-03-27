@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@clerk/nextjs";
 import {
   getRequestLogs,
   listSessions,
@@ -641,47 +642,67 @@ function LiveTracePanel({ orgSlug }: { orgSlug: string }) {
   const esRef = useRef<EventSource | null>(null);
   const pausedRef = useRef(paused);
   pausedRef.current = paused;
+  const { getToken } = useAuth();
 
   const apiBase = (
     process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
   ).replace(/\/$/, "");
 
   useEffect(() => {
-    // Get API key from localStorage
-    const apiKey = localStorage.getItem("asahio_api_key");
-    if (!apiKey) {
-      setStatus("error");
-      console.error("No API key found in localStorage");
-      return;
+    let mounted = true;
+
+    async function setupEventSource() {
+      try {
+        // Get auth token from Clerk
+        const authToken = await getToken();
+
+        if (!mounted) return;
+
+        if (!authToken) {
+          setStatus("error");
+          console.error("No auth token available");
+          return;
+        }
+
+        // EventSource doesn't support custom headers, so we pass the token as a query param
+        const url = `${apiBase}/traces/live?token=${encodeURIComponent(authToken)}`;
+        const es = new EventSource(url);
+        esRef.current = es;
+
+        es.addEventListener("connected", () => {
+          if (mounted) setStatus("connected");
+        });
+
+        es.onmessage = (event) => {
+          if (!mounted || pausedRef.current) return;
+          try {
+            const data = JSON.parse(event.data) as LiveTrace;
+            data.received_at = new Date().toISOString();
+            setTraces((prev) => [data, ...prev].slice(0, 200));
+          } catch {
+            // ignore malformed events
+          }
+        };
+
+        es.onerror = () => {
+          if (mounted) setStatus("error");
+        };
+      } catch (error) {
+        console.error("Failed to setup EventSource:", error);
+        if (mounted) setStatus("error");
+      }
     }
 
-    // EventSource doesn't support custom headers, so we pass the token as a query param
-    const url = `${apiBase}/traces/live?token=${encodeURIComponent(apiKey)}`;
-    const es = new EventSource(url);
-    esRef.current = es;
-
-    es.addEventListener("connected", () => setStatus("connected"));
-
-    es.onmessage = (event) => {
-      if (pausedRef.current) return;
-      try {
-        const data = JSON.parse(event.data) as LiveTrace;
-        data.received_at = new Date().toISOString();
-        setTraces((prev) => [data, ...prev].slice(0, 200));
-      } catch {
-        // ignore malformed events
-      }
-    };
-
-    es.onerror = () => {
-      setStatus("error");
-    };
+    setupEventSource();
 
     return () => {
-      es.close();
-      esRef.current = null;
+      mounted = false;
+      if (esRef.current) {
+        esRef.current.close();
+        esRef.current = null;
+      }
     };
-  }, [apiBase, orgSlug]);
+  }, [apiBase, orgSlug, getToken]);
 
   return (
     <div className="space-y-4">
