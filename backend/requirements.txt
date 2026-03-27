@@ -13,6 +13,9 @@ aiosqlite>=0.20.0,<1
 # Redis
 redis[hiredis]>=5.0.0,<6
 
+# Background task queue
+arq>=0.26.0,<1
+
 # Stripe
 stripe>=11.0.0,<12
 
@@ -44,6 +47,11 @@ pinecone>=5.0.0,<7
 
 # Cohere embeddings (production)
 cohere>=5.0.0,<6
+
+# Monitoring & Observability
+prometheus-client>=0.20.0,<1
+sentry-sdk[fastapi]>=2.0.0,<3
+logtail-python>=0.2.0,<1
 
 # Dev
 pytest>=8.0.0,<9

@@ -38,9 +38,13 @@ class DependencyClassification:
 # Precompiled patterns for performance (<1ms target)
 
 # CRITICAL: action verbs that require fresh execution
+# Also includes revision/update workflows that should never use stale cached responses
 _CRITICAL_PATTERNS = [
     re.compile(r"\b(execute|deploy|run|send|delete|drop|remove|kill|terminate|push|publish)\b", re.IGNORECASE),
     re.compile(r"\b(do it now|make it happen|go ahead|proceed|confirm and)\b", re.IGNORECASE),
+    re.compile(r"\b(revise|update|improve|address|incorporate|reflect)\s+(the|this|my|your)\s+(comment|feedback|review|response|answer|suggestion)\b", re.IGNORECASE),
+    re.compile(r"\b(write|post|create|generate)\s+(a|an|the)?\s*(new|updated|revised|different)\s+(comment|response|reply|message|ticket|issue)\b", re.IGNORECASE),
+    re.compile(r"\b(based on|given|considering)\s+(the|this|my)?\s*(latest|new|recent|updated)\s+(feedback|comment|review|input|state)\b", re.IGNORECASE),
 ]
 
 # DEPENDENT: strong references to prior context that require it

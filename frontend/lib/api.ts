@@ -63,6 +63,8 @@ export interface RequestLogEntry {
   intervention_level: number | null;
   risk_factors: Record<string, number> | null;
   created_at: string;
+  asahio?: CompletionMetadata;
+  asahi?: CompletionMetadata;
 }
 
 export interface PaginatedResponse<T> {
@@ -164,6 +166,71 @@ export interface AuditLogEntry {
   ip_address: string | null;
 }
 
+export interface CacheDebug {
+  bypass_requested: boolean;
+  dependency_level: 'INDEPENDENT' | 'PARTIAL' | 'DEPENDENT' | 'CRITICAL';
+  skip_reason: string | null;
+  cache_key_prefix: string | null;
+  semantic_similarity: number | null;
+  cache_age_seconds: number;
+}
+
+export interface RoutingDebug {
+  routing_mode: 'AUTO' | 'EXPLICIT' | 'GUIDED';
+  selected_model: string;
+  selected_provider: string;
+  confidence: number;
+  selection_reason: string;
+  considered_models?: Array<{
+    provider: string;
+    model: string;
+    score: number;
+    factors: Record<string, number>;
+  }>;
+  selection_factors?: {
+    complexity_weight: number;
+    context_weight: number;
+    aba_weight: number;
+    latency_weight: number;
+    budget_weight: number;
+    health_weight: number;
+  };
+  confidence_breakdown?: Record<string, number>;
+  context?: {
+    quality_preference: string;
+    latency_preference: string;
+    provider_health: Record<string, string>;
+  };
+  guided_rules?: Array<{
+    rule_type: string;
+    matched: boolean;
+    result?: string;
+  }>;
+  chain_execution?: {
+    chain_id: string;
+    chain_name: string;
+    slot_attempted: number;
+    slots_total: number;
+  };
+}
+
+export interface InterventionDebug {
+  intervention_mode: 'OBSERVE' | 'ASSISTED' | 'AUTONOMOUS';
+  risk_score: number;
+  risk_factors: {
+    hallucination_risk?: number;
+    policy_risk?: number;
+    compliance_risk?: number;
+    cost_risk?: number;
+  };
+  action: 'LOG' | 'FLAG' | 'AUGMENT' | 'REROUTE' | 'BLOCK';
+  level: number;
+  reason: string;
+  prompt_modified: boolean;
+  model_rerouted: boolean;
+  should_block: boolean;
+}
+
 export interface CompletionMetadata {
   cache_hit: boolean;
   cache_tier: string | null;
@@ -191,6 +258,9 @@ export interface CompletionMetadata {
   risk_score?: number | null;
   risk_factors?: Record<string, unknown>;
   intervention_level?: number | null;
+  cache_debug?: CacheDebug;
+  routing_debug?: RoutingDebug;
+  intervention_debug?: InterventionDebug;
 }
 
 export interface ChatCompletionResponse {

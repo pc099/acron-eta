@@ -479,3 +479,102 @@ class RedisCache:
                 return None
 
         return hit
+
+
+# ---------------------------------------------------------------------------
+# Automatic Cache Invalidation Helpers
+# ---------------------------------------------------------------------------
+
+
+async def invalidate_cache_for_agent(redis, org_id: str, agent_id: str, reason: str) -> int:
+    """Invalidate all cache entries for a specific agent.
+
+    Triggered automatically when agent config changes (routing_mode, intervention_mode, etc.)
+
+    Args:
+        redis: Redis connection
+        org_id: Organization ID
+        agent_id: Agent ID
+        reason: Reason for invalidation
+
+    Returns:
+        Number of cache entries invalidated
+    """
+    if not redis:
+        return 0
+
+    # Pattern: all cache entries for this org + agent
+    # Note: Current cache keys don't include agent_id, so we invalidate all org cache
+    # TODO: Update cache key schema to include agent_id for finer-grained invalidation
+    pattern = f"prod:{org_id}:cache:*"
+
+    invalidated_count = 0
+    cursor = 0
+
+    while True:
+        cursor, keys = await redis.scan(cursor, match=pattern, count=100)
+        if keys:
+            await redis.delete(*keys)
+            invalidated_count += len(keys)
+
+        if cursor == 0:
+            break
+
+    logger.info(
+        "Auto-invalidated cache for agent config change",
+        extra={
+            "org_id": org_id,
+            "agent_id": agent_id,
+            "invalidated_count": invalidated_count,
+            "reason": reason,
+        },
+    )
+
+    return invalidated_count
+
+
+async def invalidate_cache_for_model(redis, org_id: str, model_id: str, reason: str) -> int:
+    """Invalidate all cache entries related to a specific model.
+
+    Triggered automatically when a model endpoint is updated or deleted.
+
+    Args:
+        redis: Redis connection
+        org_id: Organization ID
+        model_id: Model ID or model endpoint ID
+        reason: Reason for invalidation
+
+    Returns:
+        Number of cache entries invalidated
+    """
+    if not redis:
+        return 0
+
+    # Pattern: all cache entries for this org
+    # Note: Current cache keys don't include model_id, so we invalidate all org cache
+    # TODO: Update cache key schema to include model_used for finer-grained invalidation
+    pattern = f"prod:{org_id}:cache:*"
+
+    invalidated_count = 0
+    cursor = 0
+
+    while True:
+        cursor, keys = await redis.scan(cursor, match=pattern, count=100)
+        if keys:
+            await redis.delete(*keys)
+            invalidated_count += len(keys)
+
+        if cursor == 0:
+            break
+
+    logger.info(
+        "Auto-invalidated cache for model change",
+        extra={
+            "org_id": org_id,
+            "model_id": model_id,
+            "invalidated_count": invalidated_count,
+            "reason": reason,
+        },
+    )
+
+    return invalidated_count

@@ -65,6 +65,228 @@ interface LiveTrace {
   received_at: string;
 }
 
+function DebugPanels({ log }: { log: RequestLogEntry }) {
+  const [cacheOpen, setCacheOpen] = useState(false);
+  const [routingOpen, setRoutingOpen] = useState(false);
+  const [interventionOpen, setInterventionOpen] = useState(false);
+
+  const metadata = log.asahio || log.asahi;
+  const cacheDebug = metadata?.cache_debug;
+  const routingDebug = metadata?.routing_debug;
+  const interventionDebug = metadata?.intervention_debug;
+
+  const hasAnyDebug = cacheDebug || routingDebug || interventionDebug;
+
+  if (!hasAnyDebug) return null;
+
+  return (
+    <div className="mt-4 space-y-2 border-t border-border/50 pt-3">
+      <h4 className="text-xs font-semibold text-muted-foreground mb-2">Debug Metadata</h4>
+
+      {/* Cache Debug */}
+      {cacheDebug && (
+        <details
+          className="group rounded-md border border-border bg-muted/30"
+          open={cacheOpen}
+          onToggle={(e) => setCacheOpen((e.target as HTMLDetailsElement).open)}
+        >
+          <summary className="cursor-pointer px-3 py-2 text-xs font-medium text-foreground hover:bg-muted/50 flex items-center gap-2">
+            <Database className="h-3 w-3 text-asahio" />
+            Cache Decision
+            <ChevronRight className={cn("h-3 w-3 ml-auto transition-transform", cacheOpen && "rotate-90")} />
+          </summary>
+          <div className="px-4 py-3 space-y-2 border-t border-border/50 text-xs">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <span className="text-muted-foreground">Dependency Level:</span>
+                <p className="font-mono text-foreground">{cacheDebug.dependency_level}</p>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Bypass Requested:</span>
+                <p className="font-mono text-foreground">{cacheDebug.bypass_requested ? "Yes" : "No"}</p>
+              </div>
+              {cacheDebug.skip_reason && (
+                <div className="col-span-2">
+                  <span className="text-muted-foreground">Skip Reason:</span>
+                  <p className="text-foreground">{cacheDebug.skip_reason}</p>
+                </div>
+              )}
+              {cacheDebug.semantic_similarity !== null && (
+                <div>
+                  <span className="text-muted-foreground">Semantic Similarity:</span>
+                  <p className="font-mono text-foreground">{cacheDebug.semantic_similarity.toFixed(3)}</p>
+                </div>
+              )}
+              <div>
+                <span className="text-muted-foreground">Cache Age:</span>
+                <p className="font-mono text-foreground">{cacheDebug.cache_age_seconds}s</p>
+              </div>
+              {cacheDebug.cache_key_prefix && (
+                <div className="col-span-2">
+                  <span className="text-muted-foreground">Cache Key Prefix:</span>
+                  <p className="font-mono text-xs text-foreground break-all">{cacheDebug.cache_key_prefix}</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </details>
+      )}
+
+      {/* Routing Debug */}
+      {routingDebug && (
+        <details
+          className="group rounded-md border border-border bg-muted/30"
+          open={routingOpen}
+          onToggle={(e) => setRoutingOpen((e.target as HTMLDetailsElement).open)}
+        >
+          <summary className="cursor-pointer px-3 py-2 text-xs font-medium text-foreground hover:bg-muted/50 flex items-center gap-2">
+            <GitBranch className="h-3 w-3 text-asahio" />
+            Routing Decision
+            <ChevronRight className={cn("h-3 w-3 ml-auto transition-transform", routingOpen && "rotate-90")} />
+          </summary>
+          <div className="px-4 py-3 space-y-3 border-t border-border/50 text-xs">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <span className="text-muted-foreground">Routing Mode:</span>
+                <p className="font-mono text-foreground">{routingDebug.routing_mode}</p>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Confidence:</span>
+                <p className="font-mono text-foreground">{routingDebug.confidence.toFixed(3)}</p>
+              </div>
+              <div className="col-span-2">
+                <span className="text-muted-foreground">Selection Reason:</span>
+                <p className="text-foreground">{routingDebug.selection_reason}</p>
+              </div>
+            </div>
+
+            {routingDebug.considered_models && routingDebug.considered_models.length > 0 && (
+              <div>
+                <span className="text-muted-foreground font-medium">Considered Models:</span>
+                <div className="mt-2 space-y-1">
+                  {routingDebug.considered_models.map((m, i) => (
+                    <div key={i} className="flex items-center justify-between bg-background/50 rounded px-2 py-1">
+                      <span className="font-mono">{m.provider}/{m.model}</span>
+                      <span className="text-muted-foreground">score: {m.score.toFixed(3)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {routingDebug.selection_factors && (
+              <div>
+                <span className="text-muted-foreground font-medium">Selection Factors:</span>
+                <div className="mt-2 grid grid-cols-2 gap-2">
+                  {Object.entries(routingDebug.selection_factors).map(([factor, weight]) => (
+                    <div key={factor} className="flex justify-between">
+                      <span className="text-muted-foreground">{factor.replace('_weight', '')}:</span>
+                      <span className="font-mono text-foreground">{(weight as number).toFixed(2)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {routingDebug.chain_execution && (
+              <div>
+                <span className="text-muted-foreground font-medium">Chain Execution:</span>
+                <div className="mt-2 bg-background/50 rounded px-2 py-1">
+                  <p><span className="text-muted-foreground">Chain:</span> {routingDebug.chain_execution.chain_name}</p>
+                  <p><span className="text-muted-foreground">Slot:</span> {routingDebug.chain_execution.slot_attempted}/{routingDebug.chain_execution.slots_total}</p>
+                </div>
+              </div>
+            )}
+          </div>
+        </details>
+      )}
+
+      {/* Intervention Debug */}
+      {interventionDebug && (
+        <details
+          className="group rounded-md border border-border bg-muted/30"
+          open={interventionOpen}
+          onToggle={(e) => setInterventionOpen((e.target as HTMLDetailsElement).open)}
+        >
+          <summary className="cursor-pointer px-3 py-2 text-xs font-medium text-foreground hover:bg-muted/50 flex items-center gap-2">
+            <Shield className="h-3 w-3 text-asahio" />
+            Intervention Reasoning
+            <ChevronRight className={cn("h-3 w-3 ml-auto transition-transform", interventionOpen && "rotate-90")} />
+          </summary>
+          <div className="px-4 py-3 space-y-3 border-t border-border/50 text-xs">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <span className="text-muted-foreground">Intervention Mode:</span>
+                <p className="font-mono text-foreground">{interventionDebug.intervention_mode}</p>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Action:</span>
+                <p className="font-mono text-foreground">{interventionDebug.action}</p>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Risk Score:</span>
+                <p className="font-mono text-foreground">{interventionDebug.risk_score.toFixed(4)}</p>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Level:</span>
+                <p className="font-mono text-foreground">{interventionDebug.level}</p>
+              </div>
+              <div className="col-span-2">
+                <span className="text-muted-foreground">Reason:</span>
+                <p className="text-foreground">{interventionDebug.reason}</p>
+              </div>
+            </div>
+
+            <div>
+              <span className="text-muted-foreground font-medium">Risk Factors:</span>
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                {Object.entries(interventionDebug.risk_factors).map(([factor, score]) => (
+                  score !== undefined && (
+                    <div key={factor} className="flex justify-between">
+                      <span className="text-muted-foreground">{factor.replace('_risk', '')}:</span>
+                      <span className="font-mono text-foreground">{(score as number).toFixed(3)}</span>
+                    </div>
+                  )
+                ))}
+              </div>
+            </div>
+
+            <div className="flex gap-4">
+              <div className="flex items-center gap-2">
+                <span className="text-muted-foreground">Prompt Modified:</span>
+                <span className={cn(
+                  "font-mono",
+                  interventionDebug.prompt_modified ? "text-orange-400" : "text-muted-foreground"
+                )}>
+                  {interventionDebug.prompt_modified ? "Yes" : "No"}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-muted-foreground">Model Rerouted:</span>
+                <span className={cn(
+                  "font-mono",
+                  interventionDebug.model_rerouted ? "text-orange-400" : "text-muted-foreground"
+                )}>
+                  {interventionDebug.model_rerouted ? "Yes" : "No"}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-muted-foreground">Should Block:</span>
+                <span className={cn(
+                  "font-mono",
+                  interventionDebug.should_block ? "text-red-400" : "text-muted-foreground"
+                )}>
+                  {interventionDebug.should_block ? "Yes" : "No"}
+                </span>
+              </div>
+            </div>
+          </div>
+        </details>
+      )}
+    </div>
+  );
+}
+
 function SessionGraphPanel({ graph }: { graph: SessionGraphResponse }) {
   if (graph.step_count === 0) {
     return (
@@ -713,6 +935,10 @@ function TraceRow({
                 </div>
               </div>
             )}
+
+            {/* Debug panels - new observability features */}
+            <DebugPanels log={log} />
+
             <div className="mt-4 border-t border-border/50 pt-3 flex items-center gap-3">
               {log.call_trace_id && log.agent_id ? (
                 <HallucinationTagButton callTraceId={log.call_trace_id} orgSlug={orgSlug} />

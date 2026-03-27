@@ -114,6 +114,8 @@ class RoutingDecision:
     confidence: float
     reason: str
     factors: dict = field(default_factory=dict)
+    # Debug metadata for routing transparency
+    metadata: Optional[dict] = field(default_factory=lambda: None)
 
 
 @dataclass
@@ -261,11 +263,71 @@ class RoutingEngine:
         """Route a request to the best model based on mode."""
         mode = ctx.routing_mode.upper()
         if mode == "EXPLICIT":
-            return self._route_explicit(ctx)
+            decision = self._route_explicit(ctx)
         elif mode == "GUIDED":
-            return self._route_guided(ctx)
+            decision = self._route_guided(ctx)
         else:
-            return self._route_auto(ctx)
+            decision = self._route_auto(ctx)
+
+        # Attach debug metadata for routing transparency
+        decision.metadata = self._build_routing_metadata(ctx, decision)
+        return decision
+
+    def _build_routing_metadata(self, ctx: RoutingContext, decision: RoutingDecision) -> dict:
+        """Build comprehensive routing metadata for debugging.
+
+        Returns metadata including:
+        - routing_mode: The mode used (AUTO/EXPLICIT/GUIDED)
+        - considered_models: List of all model candidates evaluated
+        - selection_factors: Detailed breakdown of why this model was chosen
+        - confidence_breakdown: How confidence score was calculated
+        - context_snapshot: Key context values at decision time
+        """
+        metadata = {
+            "routing_mode": ctx.routing_mode.upper(),
+            "selected_model": decision.selected_model,
+            "selected_provider": decision.selected_provider,
+            "confidence": decision.confidence,
+            "selection_reason": decision.reason,
+        }
+
+        # Context snapshot
+        metadata["context"] = {
+            "quality_preference": ctx.quality_preference,
+            "latency_preference": ctx.latency_preference,
+            "model_override": ctx.model_override,
+            "provider_hint": ctx.provider_hint,
+            "provider_health": ctx.provider_health or {},
+        }
+
+        # For AUTO mode, include candidates and scoring
+        if ctx.routing_mode.upper() == "AUTO":
+            # Get all available models
+            available_models = []
+            for model_id, model_info in self._models.items():
+                provider = model_info.get("provider", "unknown")
+                health = ctx.provider_health.get(provider, "healthy") if ctx.provider_health else "healthy"
+                available_models.append({
+                    "model_id": model_id,
+                    "provider": provider,
+                    "provider_health": health,
+                    "cost_per_1k_input": model_info.get("cost_per_1k_input_tokens", 0),
+                    "cost_per_1k_output": model_info.get("cost_per_1k_output_tokens", 0),
+                    "quality": model_info.get("quality", 0),
+                    "latency_class": model_info.get("latency_class", "unknown"),
+                })
+
+            metadata["considered_models"] = available_models
+            metadata["total_candidates"] = len(available_models)
+
+        # For GUIDED mode, include rules evaluated
+        if ctx.routing_mode.upper() == "GUIDED" and ctx.guided_rules:
+            metadata["guided_rules"] = ctx.guided_rules
+
+        # Include decision factors (already populated by routing methods)
+        metadata["factors"] = decision.factors
+
+        return metadata
 
     @staticmethod
     def check_capability_match(

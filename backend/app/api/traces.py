@@ -46,6 +46,10 @@ async def _get_org_id(request: Request) -> uuid.UUID:
 def _serialize_trace(trace: CallTrace) -> dict:
     meta = trace.trace_metadata or {}
     risk_factors = meta.get("risk_factors") if meta else None
+    cache_debug = meta.get("cache_debug") if meta else None
+    routing_debug = meta.get("routing_debug") if meta else None
+    intervention_debug = meta.get("intervention_debug") if meta else None
+
     return {
         "id": str(trace.id),
         "organisation_id": str(trace.organisation_id),
@@ -67,6 +71,9 @@ def _serialize_trace(trace: CallTrace) -> dict:
         "risk_score": float(trace.risk_score) if trace.risk_score is not None else None,
         "intervention_level": trace.intervention_level,
         "risk_factors": risk_factors,
+        "cache_debug": cache_debug,
+        "routing_debug": routing_debug,
+        "intervention_debug": intervention_debug,
         "trace_metadata": meta,
         "created_at": trace.created_at.isoformat() if trace.created_at else None,
     }

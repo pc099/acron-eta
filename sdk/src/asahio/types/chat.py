@@ -36,6 +36,9 @@ class AsahioMetadata:
     intervention_level: Optional[int] = None
     tools_requested: Optional[list[str]] = None
     tools_called: Optional[list[str]] = None
+    cache_debug: Optional[dict] = None
+    routing_debug: Optional[dict] = None
+    intervention_debug: Optional[dict] = None
 
     @classmethod
     def from_dict(cls, data: dict) -> "AsahioMetadata":
@@ -66,6 +69,9 @@ class AsahioMetadata:
             intervention_level=data.get("intervention_level"),
             tools_requested=data.get("tools_requested"),
             tools_called=data.get("tools_called"),
+            cache_debug=data.get("cache_debug"),
+            routing_debug=data.get("routing_debug"),
+            intervention_debug=data.get("intervention_debug"),
         )
 
     @property

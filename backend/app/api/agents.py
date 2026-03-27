@@ -175,7 +175,8 @@ async def update_agent(
     if not agent:
         raise HTTPException(status_code=404, detail="Agent not found")
 
-    await _resolve_model_endpoint(db, org_id, body.model_endpoint_id)
+    if body.model_endpoint_id is not None:
+        await _resolve_model_endpoint(db, org_id, body.model_endpoint_id)
 
     if body.name is not None:
         agent.name = body.name

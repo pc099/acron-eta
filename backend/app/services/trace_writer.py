@@ -51,6 +51,11 @@ class TracePayload:
     error_message: Optional[str] = None
     trace_metadata: Optional[dict] = None
 
+    # Debug metadata for observability
+    cache_metadata: Optional[dict] = None
+    routing_metadata: Optional[dict] = None
+    intervention_metadata: Optional[dict] = None
+
     # SDK v2 tool support
     tools_requested: Optional[dict] = None
     tools_called: Optional[dict] = None
@@ -84,10 +89,16 @@ async def write_trace(payload: TracePayload) -> None:
             endpoint_uuid = _to_uuid(payload.model_endpoint_id)
             api_key_uuid = _to_uuid(payload.api_key_id)
 
-            # Merge risk_factors into trace_metadata
+            # Merge risk_factors and debug metadata into trace_metadata
             meta = dict(payload.trace_metadata or {})
             if payload.risk_factors:
                 meta["risk_factors"] = payload.risk_factors
+            if payload.cache_metadata:
+                meta["cache_debug"] = payload.cache_metadata
+            if payload.routing_metadata:
+                meta["routing_debug"] = payload.routing_metadata
+            if payload.intervention_metadata:
+                meta["intervention_debug"] = payload.intervention_metadata
 
             # Convert chain_id to UUID
             chain_uuid = _to_uuid(payload.chain_id)
@@ -225,5 +236,22 @@ async def write_trace(payload: TracePayload) -> None:
                 )
             except Exception:
                 logger.debug("SSE publish failed (no subscribers or import error)")
-    except Exception:
+    except Exception as exc:
         logger.exception("Failed to write trace for org %s", payload.org_id)
+
+        # Send critical alert for trace write failure (data loss event)
+        try:
+            import asyncio
+            import traceback
+            from app.core.alerts import alert_trace_write_failure
+
+            asyncio.create_task(
+                alert_trace_write_failure(
+                    org_id=payload.org_id,
+                    trace_id=payload.request_id,
+                    error=str(exc),
+                    stack_trace=traceback.format_exc(),
+                )
+            )
+        except Exception:
+            logger.error("Failed to send trace write failure alert")

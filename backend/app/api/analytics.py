@@ -398,10 +398,41 @@ async def analytics_requests(
         log = row[0]
         trace = row[1]
 
-        # Extract risk_factors from trace_metadata (Python, not SQL — avoids SQLite JSON issues)
+        # Extract metadata from trace_metadata (Python, not SQL — avoids SQLite JSON issues)
         risk_factors = None
+        cache_debug = None
+        routing_debug = None
+        intervention_debug = None
         if trace and trace.trace_metadata:
-            risk_factors = trace.trace_metadata.get("risk_factors")
+            meta = trace.trace_metadata
+            risk_factors = meta.get("risk_factors")
+            cache_debug = meta.get("cache_debug")
+            routing_debug = meta.get("routing_debug")
+            intervention_debug = meta.get("intervention_debug")
+
+        # Build asahio metadata object for consistency with gateway response
+        asahio_meta = {
+            "cache_hit": log.cache_hit,
+            "cache_tier": log.cache_tier.value if log.cache_tier else None,
+            "model_requested": log.model_requested,
+            "model_used": log.model_used,
+            "provider": log.provider,
+            "routing_mode": log.routing_mode,
+            "intervention_mode": trace.intervention_mode if trace else None,
+            "cost_without_asahio": float(log.cost_without_asahi),
+            "cost_with_asahio": float(log.cost_with_asahi),
+            "cost_without_asahi": float(log.cost_without_asahi),  # backward compat
+            "cost_with_asahi": float(log.cost_with_asahi),  # backward compat
+            "savings_usd": float(log.savings_usd),
+            "savings_pct": float(log.savings_pct) if log.savings_pct else None,
+            "risk_score": float(trace.risk_score) if trace and trace.risk_score is not None else None,
+            "risk_factors": risk_factors,
+            "intervention_level": trace.intervention_level if trace else None,
+            "request_id": trace.request_id if trace else None,
+            "cache_debug": cache_debug,
+            "routing_debug": routing_debug,
+            "intervention_debug": intervention_debug,
+        }
 
         data.append({
             "id": str(log.id),
@@ -425,6 +456,8 @@ async def analytics_requests(
             "intervention_level": trace.intervention_level if trace else None,
             "risk_factors": risk_factors,
             "created_at": log.created_at.isoformat(),
+            "asahio": asahio_meta,
+            "asahi": asahio_meta,  # backward compat alias
         })
 
     return {

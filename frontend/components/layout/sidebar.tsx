@@ -43,6 +43,7 @@ const navItems: NavItem[] = [
   { icon: ShieldAlert, label: "Interventions", path: "/interventions" },
   { icon: GitBranch, label: "Routing", path: "/routing" },
   { icon: Server, label: "Models", path: "/models" },
+  { icon: Activity, label: "Providers", path: "/providers" },
   { icon: CreditCard, label: "Billing", path: "/billing" },
   { icon: Key, label: "API Keys", path: "/keys" },
   { icon: Shield, label: "Governance", path: "/governance" },

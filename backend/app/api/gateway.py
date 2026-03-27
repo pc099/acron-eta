@@ -40,6 +40,7 @@ class ChatCompletionRequest(BaseModel):
     session_id: str | None = None
     model_endpoint_id: str | None = None
     chain_id: str | None = None
+    bypass_cache: bool = False  # Skip cache lookup/storage for write-back loops
 
     # SDK v2 agentic parameters
     tools: list[dict] | None = None
@@ -110,6 +111,7 @@ def _build_metadata(result: GatewayResult, external_session_id: str | None) -> d
     metadata = {
         "cache_hit": result.cache_hit,
         "cache_tier": result.cache_tier,
+        "cache_debug": result.cache_metadata,
         "model_requested": result.model_requested,
         "model_used": result.model_used,
         "provider": result.provider,
@@ -128,11 +130,13 @@ def _build_metadata(result: GatewayResult, external_session_id: str | None) -> d
         "routing_reason": result.routing_reason,
         "routing_factors": result.routing_factors,
         "routing_confidence": result.routing_confidence,
+        "routing_debug": result.routing_metadata,
         "policy_action": result.policy_action,
         "policy_reason": result.policy_reason,
         "risk_score": result.risk_score,
         "risk_factors": result.risk_factors,
         "intervention_level": result.intervention_level,
+        "intervention_debug": result.intervention_metadata,
         "request_id": result.request_id,
     }
     return metadata
@@ -275,6 +279,7 @@ async def chat_completions(
         agent_type=agent_type_hint,
         threshold_overrides=threshold_overrides,
         chain_config=chain_config,
+        bypass_cache=body.bypass_cache,
     )
     result.model_requested = body.model or (model_endpoint.model_id if model_endpoint else body.model)
 
@@ -324,6 +329,10 @@ async def chat_completions(
         intervention_level=result.intervention_level,
         risk_factors=result.risk_factors,
         error_message=result.error_message,
+        # Debug metadata for observability
+        cache_metadata=result.cache_metadata,
+        routing_metadata=result.routing_metadata,
+        intervention_metadata=result.intervention_metadata,
         # SDK v2 tool support
         tools_requested=tools_requested,
         tools_called=result.tools_called if hasattr(result, "tools_called") else None,
@@ -333,7 +342,16 @@ async def chat_completions(
         computer_use_enabled=body.enable_computer_use,
         chain_id=body.chain_id,
     )
-    asyncio.create_task(write_trace(trace_payload))
+
+    # Enqueue trace write with arq (retryable background task)
+    try:
+        from dataclasses import asdict
+        from app.core.task_queue import enqueue_trace_write
+
+        asyncio.create_task(enqueue_trace_write(asdict(trace_payload)))
+    except Exception as exc:
+        logger.warning("Failed to enqueue trace write, falling back to direct write: %s", exc)
+        asyncio.create_task(write_trace(trace_payload))
 
     # Fire ABA observation — never blocks the response
     if agent:
@@ -348,7 +366,16 @@ async def chat_completions(
             input_tokens=result.input_tokens or 0,
             output_tokens=result.output_tokens or 0,
         )
-        asyncio.create_task(write_aba_observation(aba_payload))
+
+        # Enqueue ABA observation with arq (retryable background task)
+        try:
+            from dataclasses import asdict
+            from app.core.task_queue import enqueue_aba_observation
+
+            asyncio.create_task(enqueue_aba_observation(asdict(aba_payload)))
+        except Exception as exc:
+            logger.warning("Failed to enqueue ABA observation, falling back to direct write: %s", exc)
+            asyncio.create_task(write_aba_observation(aba_payload))
 
     if result.error_message:
         return JSONResponse(

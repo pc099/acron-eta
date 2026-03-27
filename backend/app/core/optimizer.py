@@ -1,5 +1,7 @@
 """Bridge to the legacy optimizer used by the canonical ASAHIO backend.
 
+Metrics are exported to Prometheus via /metrics endpoint.
+
 The InferencePipeline class breaks the request lifecycle into discrete phases:
   1. score_risk        — sync <2ms risk estimate
   2. classify_dependency — dependency level for context-aware caching
@@ -52,10 +54,21 @@ _PROVIDER_RETRY_CONFIG = RetryConfig(
 )
 
 
-def _get_circuit(provider: str) -> CircuitBreaker:
-    """Get or create a circuit breaker for a provider."""
+def _get_circuit(provider: str, redis: Optional[Any] = None) -> CircuitBreaker:
+    """Get or create a circuit breaker for a provider.
+
+    Args:
+        provider: Provider name (openai, anthropic, etc.)
+        redis: Optional Redis connection for state persistence
+
+    Returns:
+        CircuitBreaker instance for the provider
+    """
     if provider not in _provider_circuits:
-        _provider_circuits[provider] = CircuitBreaker(provider, _PROVIDER_CB_CONFIG)
+        _provider_circuits[provider] = CircuitBreaker(provider, _PROVIDER_CB_CONFIG, redis)
+    elif redis and not _provider_circuits[provider]._redis:
+        # Update existing circuit with redis if it didn't have one before
+        _provider_circuits[provider]._redis = redis
     return _provider_circuits[provider]
 
 PROJECT_ROOT = str(Path(__file__).resolve().parents[3])
@@ -102,15 +115,19 @@ class GatewayResult:
     routing_reason: Optional[str] = None
     routing_factors: dict = field(default_factory=dict)
     routing_confidence: Optional[float] = None
+    routing_metadata: Optional[dict] = None  # Debug metadata: considered_models, selection_factors, confidence_breakdown
     policy_action: str = "observe_only"
     policy_reason: Optional[str] = None
     risk_score: Optional[float] = None
     risk_factors: dict = field(default_factory=dict)
     intervention_level: Optional[int] = None
+    intervention_metadata: Optional[dict] = None  # Debug metadata: action, reasoning, prompt changes, model changes
     error_message: Optional[str] = None
     # SDK v2 tool support
     tools_called: Optional[dict] = None
     tool_call_count: int = 0
+    # Cache decision metadata for debugging
+    cache_metadata: Optional[dict] = None
 
 
 def normalize_routing_mode(value: Optional[str]) -> str:
@@ -170,6 +187,7 @@ class InferencePipeline:
         agent_type: Optional[str],
         threshold_overrides: Optional[dict],
         chain_config: Optional[dict],
+        bypass_cache: bool,
     ) -> None:
         self.prompt = prompt
         self.normalized_routing_mode = normalize_routing_mode(routing_mode)
@@ -189,6 +207,7 @@ class InferencePipeline:
         self.agent_type = agent_type
         self.threshold_overrides = threshold_overrides
         self.chain_config = chain_config
+        self.bypass_cache = bypass_cache
 
         # Populated by pipeline phases
         self.start_time = time.time()
@@ -249,6 +268,71 @@ class InferencePipeline:
 
     async def _check_cache(self) -> Optional[GatewayResult]:
         """Check Redis exact / Pinecone semantic cache. Returns GatewayResult on hit."""
+        # Build cache metadata for observability
+        cache_metadata = {
+            "bypass_requested": self.bypass_cache,
+            "dependency_level": self.dep_level,
+            "skip_reason": None,
+            "cache_key_prefix": None,
+            "semantic_similarity": None,
+            "cache_age_seconds": 0,
+        }
+
+        # Explicit bypass requested (write-back loops, revision workflows, etc.)
+        if self.bypass_cache:
+            cache_metadata["skip_reason"] = "explicit_bypass"
+
+            logger.info(
+                "Cache bypassed via explicit flag",
+                extra={
+                    "org_id": self.org_id,
+                    "agent_id": self.agent_id,
+                    "bypass_cache": True,
+                    "dependency_level": self.dep_level,
+                }
+            )
+
+            # Track bypass metric
+            try:
+                from app.api.metrics import cache_bypasses_total
+                cache_bypasses_total.labels(
+                    org_id=self.org_id or "unknown",
+                    reason="explicit_bypass"
+                ).inc()
+            except Exception:
+                pass
+
+            # Store metadata in instance for later use
+            self._cache_metadata = cache_metadata
+            return None
+
+        # CRITICAL dependency classification always bypasses cache
+        if self.dep_level and self.dep_level == "CRITICAL":
+            cache_metadata["skip_reason"] = "critical_dependency"
+
+            logger.info(
+                "Cache bypassed for CRITICAL dependency",
+                extra={
+                    "org_id": self.org_id,
+                    "agent_id": self.agent_id,
+                    "dependency_level": "CRITICAL",
+                }
+            )
+
+            # Track bypass metric
+            try:
+                from app.api.metrics import cache_bypasses_total
+                cache_bypasses_total.labels(
+                    org_id=self.org_id or "unknown",
+                    reason="critical_dependency"
+                ).inc()
+            except Exception:
+                pass
+
+            # Store metadata in instance
+            self._cache_metadata = cache_metadata
+            return None
+
         if not (self.redis and self.org_id):
             return None
         try:
@@ -271,10 +355,38 @@ class InferencePipeline:
 
             if hit:
                 elapsed = int((time.time() - self.start_time) * 1000)
+
+                # Update cache metadata with hit details
+                cache_metadata.update({
+                    "skip_reason": None,
+                    "cache_key_prefix": f"org:{self.org_id[:8]}" if self.org_id else "unknown",
+                    "semantic_similarity": hit.similarity,
+                    "cache_age_seconds": hit.cache_age_seconds if hasattr(hit, "cache_age_seconds") else 0,
+                })
+
                 logger.info(
-                    "Cache %s hit for org %s (similarity=%.4f)",
-                    hit.cache_tier, self.org_id, hit.similarity or 1.0,
+                    "Cache HIT",
+                    extra={
+                        "org_id": self.org_id,
+                        "agent_id": self.agent_id,
+                        "cache_tier": hit.cache_tier,
+                        "cache_hit": True,
+                        "latency_ms": elapsed,
+                        "similarity": hit.similarity or 1.0,
+                        "cache_age_seconds": cache_metadata["cache_age_seconds"],
+                    }
                 )
+
+                # Track cache hit metric
+                try:
+                    from app.api.metrics import cache_hits_total
+                    cache_hits_total.labels(
+                        org_id=self.org_id or "unknown",
+                        tier=hit.cache_tier
+                    ).inc()
+                except Exception:
+                    pass  # Don't fail request if metrics fail
+
                 return GatewayResult(
                     response=hit.response,
                     model_used=hit.model_used,
@@ -301,9 +413,45 @@ class InferencePipeline:
                     risk_score=self.risk_breakdown.composite_score if self.risk_breakdown else None,
                     risk_factors=self.risk_breakdown.factors if self.risk_breakdown else {},
                     intervention_level=0,
+                    cache_metadata=cache_metadata,  # ← ADD DEBUG METADATA
                 )
+        except Exception as exc:
+            logger.error(
+                "Redis cache check failed",
+                extra={
+                    "org_id": self.org_id,
+                    "agent_id": self.agent_id,
+                    "error": str(exc),
+                },
+                exc_info=True
+            )
+
+        # Cache miss - log for debugging
+        cache_metadata["skip_reason"] = "miss"
+
+        logger.info(
+            "Cache MISS",
+            extra={
+                "org_id": self.org_id,
+                "agent_id": self.agent_id,
+                "cache_hit": False,
+                "dependency_level": self.dep_level,
+                "prompt_length": len(self.prompt),
+            }
+        )
+
+        # Track cache miss metric
+        try:
+            from app.api.metrics import cache_misses_total
+            cache_misses_total.labels(
+                org_id=self.org_id or "unknown",
+                dependency_level=self.dep_level or "unknown"
+            ).inc()
         except Exception:
-            logger.exception("Redis cache check failed, falling through to optimizer")
+            pass
+
+        # Store metadata for later inclusion in response
+        self._cache_metadata = cache_metadata
         return None
 
     # -- Phase 4: Intervention evaluation (sync, <0.5ms) -------------------
@@ -441,6 +589,14 @@ class InferencePipeline:
                 risk_score=r_score,
                 risk_factors=r_factors,
                 intervention_level=i_level,
+                cache_metadata=getattr(self, "_cache_metadata", None),
+                routing_metadata={
+                    "routing_mode": "GUIDED",
+                    "chain_execution": True,
+                    "chain_id": guided_chain.chain_id,
+                    "chain_name": guided_chain.name,
+                    "total_attempts": len(attempts),
+                },
             )
         except Exception as exc:
             logger.warning("Chain execution failed, falling through to normal routing: %s", exc)
@@ -483,7 +639,7 @@ class InferencePipeline:
             )
 
         selected_provider = routing_decision.selected_provider or self.provider_hint or "unknown"
-        circuit = _get_circuit(selected_provider)
+        circuit = _get_circuit(selected_provider, self.redis)
         circuit.set_provider_health(provider_health.get(selected_provider, "healthy"))
 
         loop = asyncio.get_event_loop()
@@ -535,6 +691,49 @@ class InferencePipeline:
 
     # -- Phase 8: Build response + fire background tasks -------------------
 
+    def _build_intervention_metadata(self) -> Optional[dict]:
+        """Build intervention decision metadata for debugging.
+
+        Returns metadata including:
+        - intervention_mode: The mode used (OBSERVE/ASSISTED/AUTONOMOUS)
+        - risk_score: Composite risk score
+        - risk_factors: Breakdown of risk components
+        - intervention_decision: Action taken and reasoning
+        - prompt_changes: Original vs augmented prompt
+        - model_changes: Original vs rerouted model
+        """
+        if not self.intervention_decision:
+            return None
+
+        metadata = {
+            "intervention_mode": self.norm_intervention_mode,
+            "risk_score": self.risk_breakdown.composite_score if self.risk_breakdown else None,
+            "risk_factors": self.risk_breakdown.factors if self.risk_breakdown else {},
+            "action": self.intervention_decision.action,
+            "level": self.intervention_decision.level.value if self.intervention_decision.level else None,
+            "reason": self.intervention_decision.reason,
+            "should_block": self.intervention_decision.should_block,
+        }
+
+        # Prompt changes
+        if self.intervention_decision.augmented_prompt:
+            metadata["prompt_modified"] = True
+            metadata["original_prompt_length"] = len(self.prompt)
+            metadata["augmented_prompt_length"] = len(self.intervention_decision.augmented_prompt)
+            # Don't include full prompts to avoid bloating response, but show they were modified
+        else:
+            metadata["prompt_modified"] = False
+
+        # Model changes
+        if self.intervention_decision.rerouted_model:
+            metadata["model_rerouted"] = True
+            metadata["original_model"] = self.model_override
+            metadata["rerouted_model"] = self.intervention_decision.rerouted_model
+        else:
+            metadata["model_rerouted"] = False
+
+        return metadata
+
     def _build_response(self, result, routing_decision, selected_provider: str) -> GatewayResult:
         """Assemble GatewayResult from provider response and fire background tasks."""
         elapsed = int((time.time() - self.start_time) * 1000)
@@ -549,6 +748,7 @@ class InferencePipeline:
         policy_action, policy_reason, i_level = self._resolve_policy_fields()
         r_score = self.risk_breakdown.composite_score if self.risk_breakdown else None
         r_factors = self.risk_breakdown.factors if self.risk_breakdown else {}
+        i_metadata = self._build_intervention_metadata()
 
         gateway_result = GatewayResult(
             response=result.response,
@@ -573,18 +773,30 @@ class InferencePipeline:
             routing_reason=routing_decision.reason,
             routing_factors=routing_decision.factors,
             routing_confidence=routing_decision.confidence,
+            routing_metadata=routing_decision.metadata,
             policy_action=policy_action,
             policy_reason=policy_reason,
             risk_score=r_score,
             risk_factors=r_factors,
             intervention_level=i_level,
+            intervention_metadata=i_metadata,
+            cache_metadata=getattr(self, "_cache_metadata", None),
         )
 
         # Fire background tasks
         if self.redis and self.org_id and result.response and not result.cache_hit:
-            asyncio.create_task(
-                _store_in_cache(self.redis, self.org_id, self.prompt, result.response, result.model_used)
-            )
+            # Enqueue cache storage with arq (retryable background task)
+            try:
+                from app.core.task_queue import enqueue_cache_storage
+
+                asyncio.create_task(
+                    enqueue_cache_storage(self.org_id, self.prompt, result.response, result.model_used)
+                )
+            except Exception as exc:
+                logger.warning("Failed to enqueue cache storage, falling back to direct write: %s", exc)
+                asyncio.create_task(
+                    _store_in_cache(self.redis, self.org_id, self.prompt, result.response, result.model_used)
+                )
         if self.org_id and self.intervention_decision is not None:
             _fire_intervention_log(
                 org_id=self.org_id, agent_id=self.agent_id,
@@ -633,6 +845,7 @@ async def run_inference(
     agent_type: Optional[str] = None,
     threshold_overrides: Optional[dict] = None,
     chain_config: Optional[dict] = None,
+    bypass_cache: bool = False,
 ) -> GatewayResult:
     pipeline = InferencePipeline(
         prompt=prompt,
@@ -653,6 +866,7 @@ async def run_inference(
         agent_type=agent_type,
         threshold_overrides=threshold_overrides,
         chain_config=chain_config,
+        bypass_cache=bypass_cache,
     )
     return await pipeline.execute()
 

@@ -10,7 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 from sqlalchemy.exc import ProgrammingError
 
-from app.api import aba, admin, agents, analytics, auth, billing, cache, gateway, governance, health, interventions, keys, models, orgs, providers, routing, traces
+from app.api import aba, admin, agents, analytics, auth, billing, cache, gateway, governance, health, interventions, keys, metrics, models, orgs, providers, routing, traces
 from app.config import get_settings
 from app.db import engine as _db_engine_mod
 from app.db.models import Base
@@ -91,7 +91,39 @@ async def _ensure_schema() -> None:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup: fix schema if needed, create tables + connect Redis. Shutdown: cleanup."""
+    # Configure structured logging before any other operations
+    from app.core.logging_config import configure_logging
+    configure_logging()
+
     settings = get_settings()
+
+    # Initialize Sentry error tracking
+    sentry_dsn = settings.sentry_dsn if hasattr(settings, "sentry_dsn") else None
+    if not sentry_dsn:
+        import os
+        sentry_dsn = os.getenv("SENTRY_DSN")
+
+    if sentry_dsn:
+        try:
+            import sentry_sdk
+            from sentry_sdk.integrations.fastapi import FastApiIntegration
+            from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
+
+            sentry_sdk.init(
+                dsn=sentry_dsn,
+                environment=settings.environment,
+                traces_sample_rate=0.1,  # 10% of transactions for performance monitoring
+                profiles_sample_rate=0.1,  # 10% profiling
+                integrations=[
+                    FastApiIntegration(),
+                    SqlalchemyIntegration(),
+                ],
+            )
+            logger.info("Sentry error tracking initialized for environment: %s", settings.environment)
+        except Exception as exc:
+            logger.warning("Failed to initialize Sentry: %s", exc)
+    else:
+        logger.info("Sentry DSN not configured - error tracking disabled")
 
     if settings.auto_create_schema:
         if settings.environment == "production":
@@ -142,11 +174,23 @@ async def lifespan(app: FastAPI):
     except Exception:
         logger.warning("Provider health poller failed to start")
 
+    # Start error rate monitor as background task
+    error_monitor_task = None
+    try:
+        from app.services.error_rate_monitor import get_error_rate_monitor
+        monitor = get_error_rate_monitor()
+        error_monitor_task = asyncio.create_task(monitor.run())
+        logger.info("Error rate monitor started")
+    except Exception:
+        logger.warning("Error rate monitor failed to start")
+
     yield
 
     # Shutdown
     if health_task and not health_task.done():
         health_task.cancel()
+    if error_monitor_task and not error_monitor_task.done():
+        error_monitor_task.cancel()
     if app.state.redis:
         await app.state.redis.close()
     await _db_engine_mod.engine.dispose()
@@ -204,6 +248,14 @@ def create_app() -> FastAPI:
     app.add_middleware(MeteringMiddleware)
     app.add_middleware(RateLimitMiddleware)
     app.add_middleware(AuthMiddleware)
+
+    # Add Sentry context (runs after Auth sets org_id, before CORS)
+    try:
+        from app.middleware.sentry_context import SentryContextMiddleware
+        app.add_middleware(SentryContextMiddleware)
+    except ImportError:
+        logger.debug("Sentry middleware not available (sentry-sdk not installed)")
+
     app.add_middleware(
         CORSMiddleware,
         allow_origins=origins,
@@ -244,6 +296,7 @@ def create_app() -> FastAPI:
     app.include_router(providers.router, prefix="/providers", tags=["providers"])
     app.include_router(cache.router, prefix="/cache", tags=["cache"])
     app.include_router(health.router)
+    app.include_router(metrics.router, tags=["metrics"])
 
     @app.get("/health")
     async def health_redirect(request: Request):

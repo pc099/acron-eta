@@ -75,3 +75,100 @@ async def cache_stats(request: Request) -> dict:
 
     cache = RedisCache(redis)
     return {"metrics": cache.metrics.to_dict()}
+
+
+class CacheInvalidateRequest(BaseModel):
+    """Request to invalidate cache entries."""
+
+    pattern: str = Field(
+        default="*",
+        description="Glob pattern for cache keys to invalidate (e.g., 'cache:exact:*', '*model_abc*')",
+    )
+    reason: str = Field(..., min_length=1, description="Reason for invalidation (logged in audit)")
+
+
+@router.post("/invalidate", dependencies=[require_role(MemberRole.ADMIN)])
+async def invalidate_cache(
+    body: CacheInvalidateRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Invalidate cache entries matching a pattern.
+
+    Supports glob patterns for selective invalidation:
+    - `*` - Invalidate all cache entries for this org
+    - `cache:exact:*` - Invalidate only exact cache entries
+    - `*model_abc*` - Invalidate entries related to a specific model
+
+    Invalidation is logged to the audit log for compliance.
+
+    Use cases:
+    - Agent config changed (routing mode, intervention mode)
+    - Model endpoint updated or removed
+    - Policy changes that affect responses
+    - Manual cache clearing for testing
+    """
+    import logging
+    from datetime import datetime, timezone
+
+    logger = logging.getLogger(__name__)
+
+    org_id = await _get_org_id(request)
+    redis = getattr(request.app.state, "redis", None)
+    if not redis:
+        raise HTTPException(status_code=503, detail="Cache service unavailable")
+
+    # Build Redis key pattern scoped to org
+    redis_pattern = f"prod:{org_id}:{body.pattern}"
+
+    # Scan and delete matching keys
+    invalidated_count = 0
+    cursor = 0
+
+    while True:
+        cursor, keys = await redis.scan(cursor, match=redis_pattern, count=100)
+        if keys:
+            await redis.delete(*keys)
+            invalidated_count += len(keys)
+
+        if cursor == 0:
+            break
+
+    # Log invalidation to audit log
+    try:
+        from app.db.models import AuditLog
+
+        audit_entry = AuditLog(
+            organisation_id=org_id,
+            user_id=getattr(request.state, "user_id", None),
+            action="cache_invalidate",
+            resource_type="cache",
+            resource_id=None,
+            details={
+                "pattern": body.pattern,
+                "redis_pattern": redis_pattern,
+                "invalidated_count": invalidated_count,
+                "reason": body.reason,
+            },
+            timestamp=datetime.now(timezone.utc),
+        )
+        db.add(audit_entry)
+        await db.commit()
+    except Exception as exc:
+        logger.warning("Failed to log cache invalidation to audit: %s", exc)
+
+    logger.info(
+        "Cache invalidated",
+        extra={
+            "org_id": str(org_id),
+            "pattern": body.pattern,
+            "invalidated_count": invalidated_count,
+            "reason": body.reason,
+        },
+    )
+
+    return {
+        "invalidated": invalidated_count,
+        "pattern": body.pattern,
+        "reason": body.reason,
+    }
