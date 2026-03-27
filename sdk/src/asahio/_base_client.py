@@ -17,6 +17,7 @@ from asahio._exceptions import (
     AsahioError,
     AuthenticationError,
     BudgetExceededError,
+    ConflictError,
     RateLimitError,
 )
 from asahio._version import __version__
@@ -41,6 +42,8 @@ def _map_error(response: httpx.Response) -> AsahioError:
         return AuthenticationError(body)
     if status == 402:
         return BudgetExceededError(body)
+    if status == 409:
+        return ConflictError(body)
     if status == 429:
         return RateLimitError(body)
     return APIError(status, body)

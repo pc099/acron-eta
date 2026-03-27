@@ -6,6 +6,7 @@ from asahio._exceptions import (
     AsahioError,
     AuthenticationError,
     BudgetExceededError,
+    ConflictError,
     RateLimitError,
 )
 from asahio._version import __version__
@@ -22,6 +23,7 @@ __all__ = [
     "AuthenticationError",
     "RateLimitError",
     "BudgetExceededError",
+    "ConflictError",
     "APIError",
     "APIConnectionError",
     "__version__",

@@ -98,6 +98,7 @@ def _serialize_agent(agent: Agent) -> dict:
         "id": str(agent.id),
         "name": agent.name,
         "slug": agent.slug,
+        "organisation_id": str(agent.organisation_id),
         "description": agent.description,
         "routing_mode": agent.routing_mode.value,
         "intervention_mode": agent.intervention_mode.value,
@@ -105,6 +106,10 @@ def _serialize_agent(agent: Agent) -> dict:
         "is_active": agent.is_active,
         "metadata": agent.metadata_ or {},
         "risk_threshold_overrides": agent.risk_threshold_overrides,
+        "mode_entered_at": agent.mode_entered_at.isoformat() if agent.mode_entered_at else None,
+        "autonomous_authorized_at": agent.autonomous_authorized_at.isoformat() if agent.autonomous_authorized_at else None,
+        "autonomous_authorized_by": str(agent.autonomous_authorized_by) if agent.autonomous_authorized_by else None,
+        "blueprint_id": None,  # Not yet in DB model, reserved for future use
         "created_at": agent.created_at.isoformat(),
         "updated_at": agent.updated_at.isoformat() if agent.updated_at else None,
     }

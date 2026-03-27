@@ -62,12 +62,37 @@ class BudgetExceededError(AsahioError):
         )
 
 
+class ConflictError(AsahioError):
+    """Raised when a resource already exists or conflicts with existing state (409)."""
+
+    def __init__(self, body: Any = None) -> None:
+        message = "Conflict: Resource already exists"
+        # Try to extract error message from FastAPI response
+        if isinstance(body, dict):
+            if "detail" in body:
+                message = f"Conflict: {body['detail']}"
+            elif "error" in body and isinstance(body["error"], dict):
+                message = f"Conflict: {body['error'].get('message', message)}"
+        super().__init__(
+            message,
+            status_code=409,
+            body=body,
+        )
+
+
 class APIError(AsahioError):
     """Raised for unexpected server-side errors (5xx)."""
 
     def __init__(self, status_code: int, body: Any = None) -> None:
+        message = f"API returned status {status_code}"
+        # Try to extract error message from response
+        if isinstance(body, dict):
+            if "detail" in body:
+                message = f"{message}: {body['detail']}"
+            elif "error" in body and isinstance(body["error"], dict):
+                message = f"{message}: {body['error'].get('message', '')}"
         super().__init__(
-            f"API returned status {status_code}",
+            message,
             status_code=status_code,
             body=body,
         )
