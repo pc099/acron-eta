@@ -148,6 +148,7 @@ async def fleet_overview(
 def _serialize_log(log: InterventionLog) -> dict:
     return {
         "id": str(log.id),
+        "organisation_id": str(log.organisation_id),
         "agent_id": str(log.agent_id) if log.agent_id else None,
         "call_trace_id": str(log.call_trace_id) if log.call_trace_id else None,
         "request_id": log.request_id,

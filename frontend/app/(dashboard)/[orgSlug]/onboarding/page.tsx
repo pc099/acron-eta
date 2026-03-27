@@ -121,7 +121,7 @@ export default function OnboardingPage() {
         ))}
       </div>
 
-      <div className="rounded-lg border border-border bg-card p-8 shadow-sm">
+      <div className="rounded-lg border border-border bg-card p-6 sm:p-8 shadow-sm max-h-[calc(100vh-280px)] overflow-y-auto">
         <div className="mb-6 flex items-center gap-3">
           {(() => {
             const Icon = steps[currentStep].icon;

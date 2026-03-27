@@ -21,6 +21,7 @@ class ProviderKeyCreateRequest(BaseModel):
 
 class ProviderKeyResponse(BaseModel):
     id: str
+    organisation_id: str
     provider: str
     key_hint: Optional[str] = None
     is_active: bool
@@ -38,6 +39,7 @@ class OllamaVerifyRequest(BaseModel):
 
 class OllamaConfigResponse(BaseModel):
     id: str
+    organisation_id: str
     name: Optional[str] = None
     base_url: str
     is_verified: bool
@@ -72,6 +74,7 @@ class ChainCreateRequest(BaseModel):
 
 class ChainSlotResponse(BaseModel):
     id: str
+    chain_id: str
     provider: str
     model: str
     priority: int
@@ -81,6 +84,7 @@ class ChainSlotResponse(BaseModel):
 
 class ChainResponse(BaseModel):
     id: str
+    organisation_id: str
     name: str
     fallback_triggers: list[str]
     is_default: bool

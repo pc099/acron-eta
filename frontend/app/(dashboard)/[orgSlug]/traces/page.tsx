@@ -384,6 +384,10 @@ function HallucinationTagButton({ traceId, orgSlug }: { traceId: string; orgSlug
       setTagged(data.hallucination_detected);
       queryClient.invalidateQueries({ queryKey: ["traces"] });
     },
+    onError: (error) => {
+      console.error("Failed to tag hallucination:", error);
+      alert("Failed to tag hallucination. Please try again.");
+    },
   });
 
   return (
@@ -393,15 +397,17 @@ function HallucinationTagButton({ traceId, orgSlug }: { traceId: string; orgSlug
         mutation.mutate(!tagged);
       }}
       disabled={mutation.isPending}
+      title={mutation.isError ? "Failed to tag - click to retry" : undefined}
       className={cn(
         "flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium transition-colors",
+        mutation.isError && "border-red-500 bg-red-500/20",
         tagged
           ? "border-red-500/50 bg-red-500/10 text-red-400 hover:bg-red-500/20"
           : "border-border bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground"
       )}
     >
       <AlertTriangle className="h-3 w-3" />
-      {mutation.isPending ? "..." : tagged ? "Hallucination" : "Mark Hallucination"}
+      {mutation.isPending ? "..." : mutation.isError ? "Error" : tagged ? "Hallucination" : "Mark Hallucination"}
     </button>
   );
 }
@@ -419,7 +425,17 @@ function LiveTracePanel({ orgSlug }: { orgSlug: string }) {
   ).replace(/\/$/, "");
 
   useEffect(() => {
-    const es = new EventSource(`${apiBase}/${orgSlug}/traces/live`);
+    // Get API key from localStorage
+    const apiKey = localStorage.getItem("asahio_api_key");
+    if (!apiKey) {
+      setStatus("error");
+      console.error("No API key found in localStorage");
+      return;
+    }
+
+    // EventSource doesn't support custom headers, so we pass the token as a query param
+    const url = `${apiBase}/traces/live?token=${encodeURIComponent(apiKey)}`;
+    const es = new EventSource(url);
     esRef.current = es;
 
     es.addEventListener("connected", () => setStatus("connected"));

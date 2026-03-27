@@ -425,12 +425,46 @@ async def tag_hallucination(
         )
     )
     record = result.scalar_one_or_none()
-    if not record:
-        raise HTTPException(status_code=404, detail="Structural record not found")
 
-    # Update the hallucination flag
-    record.hallucination_detected = body.hallucination_detected
-    await db.flush()
+    # If no StructuralRecord exists yet, create one from the CallTrace
+    if not record:
+        from app.db.models import CallTrace
+        trace_result = await db.execute(
+            select(CallTrace).where(
+                CallTrace.id == call_uuid,
+                CallTrace.organisation_id == org_id,
+            )
+        )
+        trace = trace_result.scalar_one_or_none()
+        if not trace:
+            raise HTTPException(status_code=404, detail="Call trace not found")
+
+        if not trace.agent_id:
+            raise HTTPException(
+                status_code=400,
+                detail="Cannot tag hallucination for traces without agent_id"
+            )
+
+        # Create a new StructuralRecord
+        record = StructuralRecord(
+            organisation_id=org_id,
+            agent_id=trace.agent_id,
+            call_trace_id=call_uuid,
+            hallucination_detected=body.hallucination_detected,
+            complexity_score=0.5,  # Default placeholder
+            agent_type="unknown",
+            output_type="text",
+            token_count=trace.input_tokens + trace.output_tokens,
+            latency_ms=trace.latency_ms or 0,
+            model_used=trace.model_used or "unknown",
+            cache_hit=trace.cache_hit or False,
+        )
+        db.add(record)
+        await db.flush()
+    else:
+        # Update existing record
+        record.hallucination_detected = body.hallucination_detected
+        await db.flush()
 
     # Recalculate the agent fingerprint hallucination_rate
     fp_result = await db.execute(

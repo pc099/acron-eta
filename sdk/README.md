@@ -67,30 +67,6 @@ print(f"Cache hit rate: {stats.cache_hit_rate:.1%}")
 eligibility = client.agents.mode_eligibility(agent.id)
 if eligibility.eligible:
     client.agents.transition_mode(agent.id, target_mode="ASSISTED")
-```
-
-## SDK v2 — Full Platform Coverage
-
-SDK v2 expands from gateway-only to **full platform coverage** with 12 resource modules:
-
-| Resource | Description | Methods |
-|----------|-------------|---------|
-| `client.agents` | Agent lifecycle, mode transitions, stats | `create()`, `list()`, `get()`, `update()`, `archive()`, `stats()`, `mode_eligibility()`, `transition_mode()`, `mode_history()`, `create_session()` |
-| `client.aba` | Agent Behavioral Analytics | `get_fingerprint()`, `list_fingerprints()`, `org_overview()`, `list_structural_records()`, `get_risk_prior()`, `list_anomalies()`, `cold_start_status()`, `create_observation()`, `tag_hallucination()` |
-| `client.chains` | Fallback chains (BYOM) | `create()`, `list()`, `get()`, `delete()`, `test()` |
-| `client.provider_keys` | BYOM provider keys | `create()`, `list()`, `get()`, `delete()`, `rotate()` |
-| `client.routing` | Routing dry runs, constraints | `dry_run()`, `get_decision()`, `list_constraints()`, `create_constraint()`, `delete_constraint()` |
-| `client.traces` | Call traces and sessions | `get()`, `list()`, `get_session()`, `list_sessions()`, `get_session_graph()`, `list_session_steps()` |
-| `client.interventions` | Intervention logs and stats | `list_logs()`, `get_stats()`, `fleet_overview()` |
-| `client.analytics` | Cost, savings, cache performance | `overview()`, `model_breakdown()`, `cache_performance()`, `savings()` |
-| `client.billing` | Plans, subscriptions, usage | `get_subscription()`, `list_plans()`, `get_usage()`, `update_subscription()` |
-| `client.models` | Model registry, custom endpoints | `list()`, `get()`, `create_endpoint()`, `list_endpoints()`, `get_endpoint()`, `update_endpoint()`, `delete_endpoint()` |
-| `client.ollama` | Ollama configuration | `get_config()`, `update_config()`, `test_connection()` |
-| `client.health` | Provider health checks | `check()`, `list_providers()`, `get_provider()` |
-
-## Agentic Capabilities (SDK v2)
-
-SDK v2 adds full support for tool use, web search, MCP, and computer use:
 
 ### Tool Use (Function Calling)
 
@@ -400,7 +376,7 @@ The SDK ignores the gateway's trailing `event: asahio` metadata event to maintai
 ```python
 client = Asahio(
     api_key="asahio_live_your_key",  # Or set ASAHIO_API_KEY env var
-    base_url="https://api.asahio.dev",  # Custom gateway URL
+    base_url="https://api.asahio.in",  # Custom gateway URL
     timeout=120.0,  # Request timeout in seconds
     max_retries=2,  # Retry failed requests
     org_slug="your-org",  # Multi-tenant org routing
@@ -431,10 +407,6 @@ All 40+ types are exported from `asahio.types`.
 
 Legacy imports still work:
 
-```python
-from asahi import Asahi  # → Asahio
-from acorn import Acorn  # → Asahio
-```
 
 Response metadata is accessible at both `response.asahio` and `response.asahi`.
 
@@ -467,10 +439,9 @@ ruff check src/
 
 ## Links
 
-- **Homepage**: https://asahio.dev
-- **Documentation**: https://docs.asahio.dev
-- **Dashboard**: https://app.asahio.dev
-- **GitHub**: https://github.com/asahio-ai/asahio-python
+- **Homepage**: https://asahio.in
+- **Documentation**: https://www.asahio.in/docs
+- **GitHub**: https://github.com/pc099/asahio
 - **PyPI**: https://pypi.org/project/asahio/
 
 ## License

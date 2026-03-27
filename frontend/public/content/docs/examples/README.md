@@ -18,17 +18,34 @@ export ASAHIO_API_KEY="asahio_live_your_key"
 ## Examples
 
 ### 1. Basic Usage
-**File:** `01_basic_usage.py`
 
-Demonstrates the fundamentals:
-- Initializing the ASAHIO client
-- Making a simple chat completion request
-- Accessing response metadata (cost, savings, model used)
-- Understanding cache behavior
+Demonstrates the fundamentals of using ASAHIO:
 
-**Run:**
-```bash
-python 01_basic_usage.py
+```python
+# 01_basic_usage.py
+from asahio import Asahio
+
+# Initialize client (reads ASAHIO_API_KEY from environment)
+client = Asahio()
+
+# Make a simple chat completion request
+response = client.chat.completions.create(
+    messages=[
+        {"role": "user", "content": "What is the capital of France?"}
+    ],
+    routing_mode="AUTO",  # Let ASAHIO pick the best model
+)
+
+# Access the response
+print("Response:", response.choices[0].message.content)
+
+# Check ASAHIO metadata
+print(f"\nModel used: {response.asahio.model_used}")
+print(f"Provider: {response.asahio.provider}")
+print(f"Cache hit: {response.asahio.cache_hit}")
+print(f"Cost: ${response.asahio.cost_with_asahio:.4f}")
+print(f"Saved: ${response.asahio.savings_usd:.4f}")
+print(f"Routing mode: {response.asahio.routing_mode}")
 ```
 
 **Key Concepts:**
@@ -40,18 +57,54 @@ python 01_basic_usage.py
 ---
 
 ### 2. Agent Management
-**File:** `02_agent_management.py`
 
-Demonstrates agent lifecycle:
-- Creating agents with custom configuration
-- Tracking calls by agent
-- Viewing agent statistics
-- Mode transitions (OBSERVE → ASSISTED → AUTONOMOUS)
-- Checking mode eligibility
+Demonstrates agent lifecycle management:
 
-**Run:**
-```bash
-python 02_agent_management.py
+```python
+# 02_agent_management.py
+from asahio import Asahio
+
+client = Asahio()
+
+# Create an agent with custom configuration
+agent = client.agents.create(
+    name="Customer Support Bot",
+    description="Handles customer inquiries",
+    routing_mode="AUTO",
+    intervention_mode="OBSERVE",
+    metadata={"team": "support", "version": "1.0"}
+)
+
+print(f"Created agent: {agent.name} (ID: {agent.id})")
+
+# Make some tracked calls
+for prompt in [
+    "How do I reset my password?",
+    "What are your business hours?",
+    "I need help with my order"
+]:
+    response = client.chat.completions.create(
+        messages=[{"role": "user", "content": prompt}],
+        agent_id=agent.id,  # Track by agent
+    )
+    print(f"✓ Processed: {prompt[:30]}...")
+
+# View agent statistics
+stats = client.agents.stats(agent.id)
+print(f"\nAgent Statistics:")
+print(f"  Total calls: {stats.total_calls}")
+print(f"  Cache hits: {stats.cache_hits}")
+print(f"  Cache hit rate: {stats.cache_hit_rate:.1%}")
+print(f"  Avg latency: {stats.avg_latency_ms:.0f}ms")
+
+# Check mode eligibility
+eligibility = client.agents.mode_eligibility(agent.id)
+print(f"\nMode Eligibility:")
+print(f"  Current: {eligibility.current_mode}")
+print(f"  Eligible for upgrade: {eligibility.eligible}")
+if eligibility.suggested_mode:
+    print(f"  Suggested: {eligibility.suggested_mode}")
+    print(f"  Reason: {eligibility.reason}")
 ```
 
 **Key Concepts:**
@@ -63,17 +116,67 @@ python 02_agent_management.py
 ---
 
 ### 3. Tool Use (Function Calling)
-**File:** `03_tool_use.py`
 
-Demonstrates tool use workflows:
-- Converting Python functions to OpenAI tool schemas
-- Making requests with tools
-- Extracting tool calls from responses
-- Executing tools and submitting results
+Demonstrates function calling with tools:
 
-**Run:**
-```bash
-python 03_tool_use.py
+```python
+# 03_tool_use.py
+import json
+from asahio import Asahio
+from asahio.tools import function_to_tool, extract_tool_calls, format_tool_result
+
+client = Asahio()
+
+# Define a tool function
+def get_weather(location: str, units: str = "celsius") -> str:
+    """Get the current weather for a location.
+
+    Args:
+        location: City name or coordinates
+        units: Temperature units (celsius or fahrenheit)
+    """
+    # In production, call a real weather API
+    return f"The weather in {location} is 22°{units[0].upper()} and sunny"
+
+# Convert to OpenAI tool schema
+weather_tool = function_to_tool(get_weather)
+
+# Make request with tool
+response = client.chat.completions.create(
+    messages=[
+        {"role": "user", "content": "What's the weather in Paris?"}
+    ],
+    tools=[weather_tool],
+)
+
+# Extract tool calls
+tool_calls = extract_tool_calls(response.model_dump())
+
+if tool_calls:
+    print(f"Agent wants to call: {tool_calls[0]['name']}")
+    print(f"With arguments: {tool_calls[0]['arguments']}")
+
+    # Execute the tool
+    args = json.loads(tool_calls[0]['arguments'])
+    result = get_weather(**args)
+
+    # Format and submit result
+    tool_result = format_tool_result(
+        tool_call_id=tool_calls[0]['id'],
+        content=result,
+        name=tool_calls[0]['name']
+    )
+
+    # Continue conversation with tool result
+    final_response = client.chat.completions.create(
+        messages=[
+            {"role": "user", "content": "What's the weather in Paris?"},
+            response.choices[0].message.model_dump(),
+            tool_result
+        ]
+    )
+
+    print(f"\nFinal response: {final_response.choices[0].message.content}")
 ```
 
 **Key Concepts:**
@@ -85,17 +188,66 @@ python 03_tool_use.py
 ---
 
 ### 4. Sessions and Traces
-**File:** `04_sessions_and_traces.py`
 
-Demonstrates session management and observability:
-- Creating agent sessions
-- Multi-turn conversations
-- Viewing trace history
-- Analyzing session graphs
+Demonstrates session tracking and observability:
 
-**Run:**
-```bash
-python 04_sessions_and_traces.py
+```python
+# 04_sessions_and_traces.py
+from asahio import Asahio
+
+client = Asahio()
+
+# Create an agent
+agent = client.agents.create(
+    name="Support Agent",
+    routing_mode="AUTO",
+    intervention_mode="ASSISTED"
+)
+
+# Create a session for tracking multi-turn conversations
+session = client.agents.create_session(
+    agent_id=agent.id,
+    external_session_id="user_123_session_456"
+)
+
+print(f"Created session: {session.id}")
+
+# Have a multi-turn conversation
+conversation = [
+    "I need help with my account",
+    "I forgot my password",
+    "How long will the reset email take?"
+]
+
+for message in conversation:
+    response = client.chat.completions.create(
+        messages=[{"role": "user", "content": message}],
+        agent_id=agent.id,
+        session_id=session.external_session_id,
+    )
+    print(f"\nUser: {message}")
+    print(f"Agent: {response.choices[0].message.content[:100]}...")
+
+# View all traces for this agent
+traces = client.traces.list_traces(
+    agent_id=agent.id,
+    limit=10
+)
+
+print(f"\n=== Trace History ({len(traces)} traces) ===")
+for trace in traces:
+    print(f"  {trace.created_at}: {trace.model_used} "
+          f"(${trace.cost_with_asahio:.4f}, cache: {trace.cache_hit})")
+
+# Get session graph to see dependencies
+graph = client.traces.get_session_graph(session_id=session.id)
+print(f"\n=== Session Graph ===")
+print(f"Total steps: {graph.step_count}")
+for step in graph.steps:
+    print(f"  Step {step.step_number}: {step.model_used} "
+          f"({step.latency_ms}ms, cache: {step.cache_hit})")
+    if step.depends_on:
+        print(f"    Depends on steps: {step.depends_on}")
 ```
 
 **Key Concepts:**
@@ -107,19 +259,68 @@ python 04_sessions_and_traces.py
 ---
 
 ### 5. Analytics and Cost Monitoring
-**File:** `05_analytics_and_cost.py`
 
-Demonstrates cost analytics:
-- Viewing cost analytics over time periods
-- Model usage breakdown
-- Cache performance metrics
-- Savings analysis
-- Per-agent analytics
-- Fleet-wide intervention monitoring
+Demonstrates cost monitoring and analytics:
 
-**Run:**
-```bash
-python 05_analytics_and_cost.py
+```python
+# 05_analytics_and_cost.py
+from datetime import datetime, timedelta
+from asahio import Asahio
+
+client = Asahio()
+
+# Get overall analytics for the last 30 days
+overview = client.analytics.get_overview(
+    period="30d"
+)
+
+print("=== Cost Overview (30 days) ===")
+print(f"Total cost: ${overview.total_cost:.2f}")
+print(f"Total savings: ${overview.total_savings:.2f}")
+print(f"Total requests: {overview.total_requests:,}")
+print(f"Cache hit rate: {overview.cache_hit_rate:.1%}")
+print(f"Avg latency: {overview.avg_latency_ms:.0f}ms")
+
+# Get model breakdown
+breakdown = client.analytics.get_model_breakdown(
+    start_date=(datetime.now() - timedelta(days=7)).isoformat(),
+    end_date=datetime.now().isoformat()
+)
+
+print("\n=== Model Usage (7 days) ===")
+for model in breakdown.models:
+    print(f"{model.model_name}:")
+    print(f"  Calls: {model.call_count:,}")
+    print(f"  Cost: ${model.total_cost:.2f}")
+    print(f"  Tokens: {model.total_tokens:,}")
+
+# Get cache performance
+cache_stats = client.analytics.get_cache_performance()
+
+print("\n=== Cache Performance ===")
+print(f"Redis hits: {cache_stats.redis_hits:,}")
+print(f"Pinecone hits: {cache_stats.pinecone_hits:,}")
+print(f"Total hit rate: {cache_stats.total_hit_rate:.1%}")
+print(f"Avg lookup time: {cache_stats.avg_lookup_ms:.1f}ms")
+
+# Get intervention stats
+intervention_stats = client.interventions.get_stats(days=30)
+
+print("\n=== Intervention Summary ===")
+for level_stat in intervention_stats.data:
+    print(f"Level {level_stat.level}: {level_stat.count:,} interventions")
+
+# Get fleet overview
+fleet = client.interventions.get_fleet_overview()
+
+print("\n=== Fleet Overview ===")
+print(f"Agents by mode:")
+for mode, count in fleet.mode_distribution.items():
+    print(f"  {mode}: {count} agents")
+
+print(f"\nInterventions:")
+for action, count in fleet.intervention_summary.items():
+    print(f"  {action}: {count}")
 ```
 
 **Key Concepts:**
@@ -127,7 +328,7 @@ python 05_analytics_and_cost.py
 - Model usage analytics
 - Cache performance
 - Savings attribution
-- Billing integration
+- Intervention monitoring
 
 ---
 

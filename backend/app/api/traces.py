@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 import logging
 import uuid
@@ -15,7 +16,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.engine import get_db
-from app.db.models import AgentSession, CallTrace, RoutingDecisionLog
+from app.db.models import AgentSession, ApiKey, CallTrace, RoutingDecisionLog
 
 logger = logging.getLogger(__name__)
 
@@ -47,6 +48,7 @@ def _serialize_trace(trace: CallTrace) -> dict:
     risk_factors = meta.get("risk_factors") if meta else None
     return {
         "id": str(trace.id),
+        "organisation_id": str(trace.organisation_id),
         "agent_id": str(trace.agent_id) if trace.agent_id else None,
         "agent_session_id": str(trace.agent_session_id) if trace.agent_session_id else None,
         "request_id": trace.request_id,
@@ -73,6 +75,7 @@ def _serialize_trace(trace: CallTrace) -> dict:
 def _serialize_session(session: AgentSession, trace_count: int = 0) -> dict:
     return {
         "id": str(session.id),
+        "organisation_id": str(session.organisation_id),
         "agent_id": str(session.agent_id),
         "external_session_id": session.external_session_id,
         "started_at": session.started_at.isoformat() if session.started_at else None,
@@ -310,13 +313,31 @@ async def get_session_graph(
 async def live_traces(
     request: Request,
     agent_id: Optional[str] = Query(default=None),
+    token: Optional[str] = Query(default=None),
+    db: AsyncSession = Depends(get_db),
 ):
     """SSE endpoint that streams new traces in real-time.
 
     Clients connect via EventSource. Each event is a JSON-serialized trace.
     Optional agent_id filter to only receive traces for a specific agent.
+    Optional token query param for EventSource clients (which can't send headers).
     """
+    # Try to get org_id from request.state (set by AuthMiddleware)
     org_id = getattr(request.state, "org_id", None)
+
+    # If no org_id from middleware, try the token query param
+    if not org_id and token:
+        key_hash = hashlib.sha256(token.encode()).hexdigest()
+        result = await db.execute(
+            select(ApiKey).where(
+                ApiKey.key_hash == key_hash,
+                ApiKey.is_active.is_(True),
+            )
+        )
+        api_key = result.scalar_one_or_none()
+        if api_key:
+            org_id = api_key.organisation_id
+
     if not org_id:
         raise HTTPException(status_code=403, detail="Organisation context required")
     org_str = str(org_id)

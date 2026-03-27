@@ -47,6 +47,7 @@ async def _get_org_id(request: Request) -> uuid.UUID:
 def _serialize_key(pk: ProviderKey) -> dict:
     return ProviderKeyResponse(
         id=str(pk.id),
+        organisation_id=str(pk.organisation_id),
         provider=pk.provider,
         key_hint=pk.key_hint,
         is_active=pk.is_active,
@@ -58,6 +59,7 @@ def _serialize_key(pk: ProviderKey) -> dict:
 def _serialize_ollama(config: OllamaConfig) -> dict:
     return OllamaConfigResponse(
         id=str(config.id),
+        organisation_id=str(config.organisation_id),
         name=config.name,
         base_url=config.base_url,
         is_verified=config.is_verified,
@@ -74,6 +76,7 @@ def _serialize_chain(chain: GuidedChain, slots: list[ChainSlot] | None = None) -
     slots = sorted(slots, key=lambda s: s.priority)
     return ChainResponse(
         id=str(chain.id),
+        organisation_id=str(chain.organisation_id),
         name=chain.name,
         fallback_triggers=chain.fallback_triggers or [],
         is_default=chain.is_default,
@@ -81,6 +84,7 @@ def _serialize_chain(chain: GuidedChain, slots: list[ChainSlot] | None = None) -
         slots=[
             ChainSlotResponse(
                 id=str(s.id),
+                chain_id=str(s.chain_id),
                 provider=s.provider,
                 model=s.model,
                 priority=s.priority,
