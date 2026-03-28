@@ -755,6 +755,28 @@ class InferencePipeline:
         r_factors = self.risk_breakdown.factors if self.risk_breakdown else {}
         i_metadata = self._build_intervention_metadata()
 
+        # Classification and hallucination detection
+        from app.services.classifiers import classify_agent_type, classify_output_type, estimate_complexity
+        from app.services.hallucination_detector import HallucinationDetector
+
+        agent_type = classify_agent_type(
+            prompt=self.prompt,
+            agent_name=getattr(self.agent, "name", None) if hasattr(self, "agent") else None,
+            agent_metadata=getattr(self.agent, "metadata_", None) if hasattr(self, "agent") else None,
+        )
+        output_type = classify_output_type(result.response)
+        complexity_score = estimate_complexity(
+            prompt=self.prompt,
+            response=result.response,
+            input_tokens=result.tokens_input,
+            output_tokens=result.tokens_output,
+        )
+
+        # Hallucination detection
+        detector = HallucinationDetector(threshold=0.5)
+        hallucination_result = detector.check(prompt=self.prompt, response=result.response)
+        hallucination_detected = hallucination_result.detected
+
         gateway_result = GatewayResult(
             response=result.response,
             request_id=getattr(result, "request_id", None),
@@ -786,6 +808,11 @@ class InferencePipeline:
             intervention_level=i_level,
             intervention_metadata=i_metadata,
             cache_metadata=getattr(self, "_cache_metadata", None),
+            # ABA / Model C classification fields
+            agent_type=agent_type,
+            complexity_score=complexity_score,
+            output_type=output_type,
+            hallucination_detected=hallucination_detected,
         )
 
         # Fire background tasks

@@ -41,6 +41,11 @@ class OrgResponse(BaseModel):
     created_at: datetime
 
 
+class OrgCreateRequest(BaseModel):
+    name: str
+    slug: str
+
+
 class OrgUpdateRequest(BaseModel):
     name: Optional[str] = None
 
@@ -93,6 +98,108 @@ def _require_role(request: Request, min_roles: set[MemberRole]) -> MemberRole:
 
 
 # ── Routes ────────────────────────────────────
+
+
+@router.post("/", status_code=201, response_model=OrgResponse)
+async def create_org(
+    body: OrgCreateRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    """Create a new organisation. Requires JWT auth. Creator becomes owner.
+
+    Also provisions a dedicated Pinecone index for the org's semantic cache.
+    """
+    import asyncio
+    from app.db.models import ApiKey, PlanTier
+    from app.services.pinecone_provisioner import provision_org_cache_index
+
+    user_id_str = getattr(request.state, "user_id", None)
+    if not user_id_str:
+        raise HTTPException(status_code=401, detail="Authentication required")
+
+    # Validate slug uniqueness
+    existing = await db.execute(
+        select(Organisation).where(Organisation.slug == body.slug)
+    )
+    if existing.scalar_one_or_none():
+        raise HTTPException(status_code=409, detail="Organisation slug already exists")
+
+    # Create organisation
+    org = Organisation(
+        id=uuid.uuid4(),
+        name=body.name,
+        slug=body.slug,
+        plan=PlanTier.FREE,
+        monthly_request_limit=10_000,
+        monthly_token_limit=1_000_000,
+        pinecone_index_name=None,  # Will be set by background task
+    )
+    db.add(org)
+    await db.flush()
+
+    # Create membership (creator is owner)
+    user_id = uuid.UUID(user_id_str)
+    member = Member(
+        organisation_id=org.id,
+        user_id=user_id,
+        role=MemberRole.OWNER,
+    )
+    db.add(member)
+
+    # Generate first API key
+    api_key_prefix = "asahio"
+    raw_key = f"{api_key_prefix}_{secrets.token_urlsafe(32)}"
+    import hashlib
+    key_hash = hashlib.sha256(raw_key.encode()).hexdigest()
+
+    api_key = ApiKey(
+        id=uuid.uuid4(),
+        organisation_id=org.id,
+        name="Default API Key",
+        key_hash=key_hash,
+        scopes=["*"],
+        is_active=True,
+    )
+    db.add(api_key)
+    await db.flush()
+
+    # Audit log
+    await write_audit(
+        db,
+        org_id=org.id,
+        user_id=user_id,
+        action="org.created",
+        resource_type="organisation",
+        resource_id=str(org.id),
+        ip_address=request.client.host if request.client else None,
+        metadata={"name": body.name, "slug": body.slug},
+    )
+
+    await db.commit()
+
+    # Provision Pinecone index (fire-and-forget background task)
+    async def provision_index():
+        index_name = await provision_org_cache_index(str(org.id))
+        if index_name:
+            # Update org with index name
+            async with db.begin():
+                org_refresh = await db.get(Organisation, org.id)
+                if org_refresh:
+                    org_refresh.pinecone_index_name = index_name
+                    await db.commit()
+
+    asyncio.create_task(provision_index())
+
+    return OrgResponse(
+        id=str(org.id),
+        name=org.name,
+        slug=org.slug,
+        plan=org.plan.value,
+        monthly_request_limit=org.monthly_request_limit,
+        monthly_token_limit=org.monthly_token_limit,
+        created_at=org.created_at,
+    )
 
 
 @router.get("/{slug}", response_model=OrgResponse)

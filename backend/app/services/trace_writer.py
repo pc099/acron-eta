@@ -217,7 +217,14 @@ async def write_trace(payload: TracePayload) -> None:
             )
 
             # Write behavioral observation to Model C pool (fire-and-forget)
-            asyncio.create_task(_write_model_c_observation(payload, org_uuid))
+            # Try to get Redis client from app state (if available)
+            try:
+                from app.main import app
+                redis_client = getattr(app.state, "redis", None)
+            except Exception:
+                redis_client = None
+
+            asyncio.create_task(_write_model_c_observation(payload, org_uuid, redis_client))
 
             # Publish to SSE live trace subscribers
             try:
@@ -270,6 +277,8 @@ async def write_trace(payload: TracePayload) -> None:
 async def _write_model_c_observation(
     payload: TracePayload,
     org_id: uuid.UUID,
+    redis_client=None,
+    sample_rate: float = 0.1,
 ) -> None:
     """Write behavioral observation to Model C pool (fire-and-forget background task).
 
@@ -280,20 +289,51 @@ async def _write_model_c_observation(
     Args:
         payload: The trace payload with behavioral signals.
         org_id: Organisation UUID (used only for privacy threshold check).
+        redis_client: Optional Redis client for caching org count.
+        sample_rate: Fraction of observations to write (0.0-1.0). Default 0.1 (10%).
     """
     try:
+        import random
         from sqlalchemy import func, select
 
         from app.db.models import CallTrace
         from app.services.model_c_pool import ModelCPool, PoolRecord
         from app.services.pinecone_provisioner import get_model_c_index
 
+        # Sample observations to reduce Pinecone costs (default: 10% sampling)
+        if random.random() > sample_rate:
+            logger.debug("Model C observation skipped (sampling: %.0f%%)", sample_rate * 100)
+            return
+
         # Get org observation count (for privacy threshold — minimum 50 observations)
-        async with async_session_factory() as db:
-            result = await db.execute(
-                select(func.count(CallTrace.id)).where(CallTrace.organisation_id == org_id)
-            )
-            org_count = result.scalar() or 0
+        # Try Redis cache first (5min TTL) to avoid DB query on every trace
+        org_count = None
+        redis_key = f"asahio:org:obs_count:{org_id}"
+
+        if redis_client:
+            try:
+                cached_count = await redis_client.get(redis_key)
+                if cached_count is not None:
+                    org_count = int(cached_count)
+                    logger.debug("Model C org count from Redis cache: %d", org_count)
+            except Exception:
+                logger.debug("Redis cache read failed for org count")
+
+        # Cache miss — query database
+        if org_count is None:
+            async with async_session_factory() as db:
+                result = await db.execute(
+                    select(func.count(CallTrace.id)).where(CallTrace.organisation_id == org_id)
+                )
+                org_count = result.scalar() or 0
+
+            # Store in Redis cache (5min TTL)
+            if redis_client:
+                try:
+                    await redis_client.set(redis_key, org_count, ex=300)
+                    logger.debug("Model C org count cached in Redis: %d", org_count)
+                except Exception:
+                    logger.debug("Redis cache write failed for org count")
 
         # Derive agent_type (default to CHATBOT if not classified)
         agent_type = payload.agent_type or "CHATBOT"
