@@ -9,13 +9,16 @@ export function formatCurrency(
   amount: number,
   currency: "USD" | "INR" = "USD"
 ): string {
+  // For micro-costs (< $0.01), show up to 6 decimal places
+  const decimals = amount > 0 && amount < 0.01 ? 6 : 2;
+
   const formatter = new Intl.NumberFormat(
     currency === "INR" ? "en-IN" : "en-US",
     {
       style: "currency",
       currency,
       minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
+      maximumFractionDigits: decimals,
     }
   );
   return formatter.format(amount);

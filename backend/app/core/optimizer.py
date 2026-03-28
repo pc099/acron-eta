@@ -739,14 +739,37 @@ class InferencePipeline:
 
         return metadata
 
+    def _calculate_baseline_cost(self, input_tokens: int, output_tokens: int) -> float:
+        """Calculate cost using baseline model (gpt-4-turbo) for comparison.
+
+        This represents what the user would pay without ASAHIO's routing optimization.
+        """
+        try:
+            from src.models.registry import get_model_config, calculate_cost
+            baseline_model = get_model_config("gpt-4-turbo")
+            if baseline_model:
+                return calculate_cost(baseline_model, input_tokens, output_tokens)
+        except Exception:
+            pass
+
+        # Fallback: use GPT-4 pricing directly ($0.01/1K input, $0.03/1K output)
+        return ((input_tokens / 1000) * 0.01) + ((output_tokens / 1000) * 0.03)
+
     def _build_response(self, result, routing_decision, selected_provider: str) -> GatewayResult:
         """Assemble GatewayResult from provider response and fire background tasks."""
         elapsed = int((time.time() - self.start_time) * 1000)
         cache_tier_map = {0: None, 1: "exact", 2: "semantic", 3: "intermediate"}
         cache_tier = cache_tier_map.get(result.cache_tier, None)
 
-        cost_original = result.cost_original or result.cost * 3
+        # Calculate real savings by comparing to baseline (gpt-4-turbo)
         cost_with = result.cost
+        if result.cost_original:
+            # Use provider-supplied baseline if available
+            cost_original = result.cost_original
+        else:
+            # Calculate what it would cost with baseline model
+            cost_original = self._calculate_baseline_cost(result.tokens_input, result.tokens_output)
+
         savings = cost_original - cost_with
         savings_pct = (savings / cost_original * 100) if cost_original > 0 else 0.0
 
