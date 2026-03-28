@@ -91,8 +91,8 @@ class Settings(BaseSettings):
 
     # Vercel AI Gateway — feature-flagged provider proxy
     use_vercel_gateway: bool = False
-    vercel_api_token: Optional[str] = None
-    vercel_gateway_url: str = "https://gateway.ai.vercel.app/v1"
+    AI_GATEWAY_API_KEY: Optional[str] = None
+    vercel_gateway_url: str = "https://ai-gateway.vercel.sh/v1"
 
     # Pinecone (semantic cache vector store)
     pinecone_api_key: Optional[str] = None

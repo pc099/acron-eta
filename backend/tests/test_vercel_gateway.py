@@ -17,36 +17,36 @@ class TestVercelGatewayProvider:
 
     def test_provider_name_returns_upstream(self) -> None:
         adapter = VercelGatewayProvider(
-            gateway_url="https://gateway.ai.vercel.app/v1",
+            gateway_url="https://ai-gateway.vercel.sh/v1",
             upstream_provider="openai",
         )
         assert adapter.provider_name == "openai"
 
     def test_provider_name_anthropic(self) -> None:
         adapter = VercelGatewayProvider(
-            gateway_url="https://gateway.ai.vercel.app/v1",
+            gateway_url="https://ai-gateway.vercel.sh/v1",
             upstream_provider="anthropic",
         )
         assert adapter.provider_name == "anthropic"
 
     def test_base_url_is_gateway(self) -> None:
         adapter = VercelGatewayProvider(
-            gateway_url="https://gateway.ai.vercel.app/v1",
+            gateway_url="https://ai-gateway.vercel.sh/v1",
             upstream_provider="openai",
         )
-        assert adapter._base_url == "https://gateway.ai.vercel.app/v1"
+        assert adapter._base_url == "https://ai-gateway.vercel.sh/v1"
 
     def test_base_url_strips_trailing_slash(self) -> None:
         adapter = VercelGatewayProvider(
-            gateway_url="https://gateway.ai.vercel.app/v1/",
+            gateway_url="https://ai-gateway.vercel.sh/v1/",
             upstream_provider="openai",
         )
-        assert adapter._base_url == "https://gateway.ai.vercel.app/v1"
+        assert adapter._base_url == "https://ai-gateway.vercel.sh/v1"
 
     def test_model_translation_openai(self) -> None:
         """Model ID should be translated to {provider}/{model} for gateway API."""
         adapter = VercelGatewayProvider(
-            gateway_url="https://gateway.ai.vercel.app/v1",
+            gateway_url="https://ai-gateway.vercel.sh/v1",
             upstream_provider="openai",
         )
         request = InferenceRequest(model="gpt-4o", prompt="Hello")
@@ -75,7 +75,7 @@ class TestVercelGatewayProvider:
 
     def test_model_translation_anthropic(self) -> None:
         adapter = VercelGatewayProvider(
-            gateway_url="https://gateway.ai.vercel.app/v1",
+            gateway_url="https://ai-gateway.vercel.sh/v1",
             upstream_provider="anthropic",
         )
         request = InferenceRequest(model="claude-sonnet-4-6", prompt="Hello")
@@ -99,7 +99,7 @@ class TestVercelGatewayProvider:
 
     def test_model_translation_preserves_request_fields(self) -> None:
         adapter = VercelGatewayProvider(
-            gateway_url="https://gateway.ai.vercel.app/v1",
+            gateway_url="https://ai-gateway.vercel.sh/v1",
             upstream_provider="openai",
         )
         request = InferenceRequest(
@@ -126,7 +126,7 @@ class TestVercelGatewayProvider:
 
     def test_supports_model_openai(self) -> None:
         adapter = VercelGatewayProvider(
-            gateway_url="https://gateway.ai.vercel.app/v1",
+            gateway_url="https://ai-gateway.vercel.sh/v1",
             upstream_provider="openai",
         )
         assert adapter.supports_model("gpt-4o") is True
@@ -139,7 +139,7 @@ class TestVercelGatewayProvider:
 
     def test_supports_model_anthropic(self) -> None:
         adapter = VercelGatewayProvider(
-            gateway_url="https://gateway.ai.vercel.app/v1",
+            gateway_url="https://ai-gateway.vercel.sh/v1",
             upstream_provider="anthropic",
         )
         assert adapter.supports_model("claude-sonnet-4-6") is True
@@ -148,7 +148,7 @@ class TestVercelGatewayProvider:
 
     def test_supports_model_google(self) -> None:
         adapter = VercelGatewayProvider(
-            gateway_url="https://gateway.ai.vercel.app/v1",
+            gateway_url="https://ai-gateway.vercel.sh/v1",
             upstream_provider="google",
         )
         assert adapter.supports_model("gemini-pro") is True
@@ -157,7 +157,7 @@ class TestVercelGatewayProvider:
 
     def test_supports_model_deepseek(self) -> None:
         adapter = VercelGatewayProvider(
-            gateway_url="https://gateway.ai.vercel.app/v1",
+            gateway_url="https://ai-gateway.vercel.sh/v1",
             upstream_provider="deepseek",
         )
         assert adapter.supports_model("deepseek-chat") is True
@@ -166,7 +166,7 @@ class TestVercelGatewayProvider:
 
     def test_supports_model_mistral(self) -> None:
         adapter = VercelGatewayProvider(
-            gateway_url="https://gateway.ai.vercel.app/v1",
+            gateway_url="https://ai-gateway.vercel.sh/v1",
             upstream_provider="mistral",
         )
         assert adapter.supports_model("mistral-large") is True
@@ -177,7 +177,7 @@ class TestVercelGatewayProvider:
 
     def test_supports_model_unknown_provider(self) -> None:
         adapter = VercelGatewayProvider(
-            gateway_url="https://gateway.ai.vercel.app/v1",
+            gateway_url="https://ai-gateway.vercel.sh/v1",
             upstream_provider="unknown_provider",
         )
         assert adapter.supports_model("gpt-4o") is False
@@ -227,7 +227,7 @@ class TestFeatureFlag:
             providers_mod._vercel_enabled = True
             providers_mod._vercel_registry = {
                 "openai": VercelGatewayProvider(
-                    gateway_url="https://gateway.ai.vercel.app/v1",
+                    gateway_url="https://ai-gateway.vercel.sh/v1",
                     upstream_provider="openai",
                 ),
             }
@@ -252,7 +252,7 @@ class TestFeatureFlag:
             providers_mod._vercel_enabled = True
             providers_mod._vercel_registry = {
                 "openai": VercelGatewayProvider(
-                    gateway_url="https://gateway.ai.vercel.app/v1",
+                    gateway_url="https://ai-gateway.vercel.sh/v1",
                     upstream_provider="openai",
                 ),
             }
@@ -278,11 +278,11 @@ class TestFeatureFlag:
             providers_mod._vercel_enabled = True
             providers_mod._vercel_registry = {
                 "openai": VercelGatewayProvider(
-                    gateway_url="https://gateway.ai.vercel.app/v1",
+                    gateway_url="https://ai-gateway.vercel.sh/v1",
                     upstream_provider="openai",
                 ),
                 "anthropic": VercelGatewayProvider(
-                    gateway_url="https://gateway.ai.vercel.app/v1",
+                    gateway_url="https://ai-gateway.vercel.sh/v1",
                     upstream_provider="anthropic",
                 ),
             }
@@ -339,7 +339,7 @@ class TestKeyResolverVercel:
 
         with patch.dict(os.environ, {
             "USE_VERCEL_GATEWAY": "true",
-            "VERCEL_API_TOKEN": "vercel-test-token-123",
+            "AI_GATEWAY_API_KEY": "vercel-test-token-123",
         }):
             key = await resolver.resolve("openai", org_id="00000000-0000-0000-0000-000000000001")
             assert key == "vercel-test-token-123"
@@ -363,7 +363,7 @@ class TestKeyResolverVercel:
 
         with patch.dict(os.environ, {
             "USE_VERCEL_GATEWAY": "true",
-            "VERCEL_API_TOKEN": "vercel-test-token-123",
+            "AI_GATEWAY_API_KEY": "vercel-test-token-123",
         }):
             with patch("app.services.key_resolver.decrypt_secret", return_value="my-byok-key"):
                 key = await resolver.resolve("openai", org_id="00000000-0000-0000-0000-000000000001")

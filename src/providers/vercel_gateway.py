@@ -38,7 +38,7 @@ class VercelGatewayProvider(OpenAICompatMixin, ProviderAdapter):
     DB records, analytics, and logs are unchanged.
 
     Args:
-        gateway_url: Base URL for Vercel AI Gateway (e.g. ``https://gateway.ai.vercel.app/v1``).
+        gateway_url: Base URL for Vercel AI Gateway (e.g. ``https://ai-gateway.vercel.sh/v1``).
         upstream_provider: Canonical provider name (e.g. ``"openai"``).
     """
 

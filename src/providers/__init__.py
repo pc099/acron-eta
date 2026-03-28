@@ -81,7 +81,7 @@ def _init_vercel_gateway() -> None:
         return
 
     gateway_url = os.environ.get(
-        "VERCEL_GATEWAY_URL", "https://gateway.ai.vercel.app/v1"
+        "VERCEL_GATEWAY_URL", "https://ai-gateway.vercel.sh/v1"
     )
 
     from src.providers.vercel_gateway import VercelGatewayProvider
@@ -175,7 +175,7 @@ _ENV_MAP: dict[str, str] = {
     "google": "GOOGLE_API_KEY",
     "deepseek": "DEEPSEEK_API_KEY",
     "mistral": "MISTRAL_API_KEY",
-    "vercel": "VERCEL_API_TOKEN",
+    "vercel": "AI_GATEWAY_API_KEY",
 }
 
 

@@ -45,12 +45,12 @@ def _maybe_add_vercel_gateway() -> None:
     """Register Vercel Gateway in the health check if USE_VERCEL_GATEWAY is enabled."""
     if os.environ.get("USE_VERCEL_GATEWAY", "").lower() in ("true", "1", "yes"):
         gateway_url = os.environ.get(
-            "VERCEL_GATEWAY_URL", "https://gateway.ai.vercel.app/v1"
+            "VERCEL_GATEWAY_URL", "https://ai-gateway.vercel.sh/v1"
         )
         # Strip /v1 suffix for base health check
         base = gateway_url.replace("/v1", "").rstrip("/")
         _PROVIDERS["vercel_gateway"] = {
-            "env_key": "VERCEL_API_TOKEN",
+            "env_key": "AI_GATEWAY_API_KEY",
             "base_url": base,
         }
         logger.info("Vercel Gateway added to health poller: %s", base)
